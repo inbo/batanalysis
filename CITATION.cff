@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using these metadata.
+title: "batanalysis: Analysis of Bat Monitoring Data in Flanders"
+authors:
+- given-names: Thierry
+  family-names: Onkelinx
+  affiliation: Research Institute for Nature and Forest (INBO)
+  orcid: 0000-0001-8804-4216
+keywords:
+- hibernating bats
+- natura2000
+- habitat directive
+contact:
+- given-names: Thierry
+  family-names: Onkelinx
+  affiliation: Research Institute for Nature and Forest (INBO)
+  orcid: 0000-0001-8804-4216
+doi: ~
+license: GPL-3.0
+repository-code: https://github.com/inbo/batanalysis/
+type: software
+abstract: "The reproducible analysis of the bat monitoring data in Flanders for the
+  reporting of the habitat directive."
+version: 0.0.1

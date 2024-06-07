@@ -1,0 +1,38 @@
+{
+  "title": "batanalysis: Analysis of Bat Monitoring Data in Flanders",
+  "version": "0.0.1",
+  "license": "GPL-3.0",
+  "upload_type": "software",
+  "description": "<p>The reproducible analysis of the bat monitoring data in Flanders for the reporting of the habitat directive.<\/p>",
+  "keywords": [
+    "hibernating bats",
+    "natura2000",
+    "habitat directive"
+  ],
+  "access_right": "open",
+  "language": "eng",
+  "contributors": [
+    {
+      "name": "Onkelinx, Thierry",
+      "affiliation": "Research Institute for Nature and Forest (INBO)",
+      "orcid": "0000-0001-8804-4216",
+      "type": "contactperson"
+    },
+    {
+      "name": "Research Institute for Nature and Forest (INBO)",
+      "type": "rightsholder"
+    }
+  ],
+  "creators": [
+    {
+      "name": "Onkelinx, Thierry",
+      "affiliation": "Research Institute for Nature and Forest (INBO)",
+      "orcid": "0000-0001-8804-4216"
+    }
+  ],
+  "communities": [
+    {
+      "identifier": "inbo"
+    }
+  ]
+}
