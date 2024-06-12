@@ -1,11 +1,12 @@
-#' Import the raw observations according to the section based protocol
+#' Import the raw observations according to the totals based protocol
 #' @param origin A `DBI` connection to the SQL Server database.
 #' @export
 #' @importFrom assertthat assert_that
-#' @importFrom dplyr anti_join count distinct filter inner_join select transmute
+#' @importFrom dplyr anti_join bind_rows count distinct filter inner_join select
+#' transmute
 #' @importFrom DBI dbGetQuery
 #' @importFrom rlang .data
-read_raw_section <- function(origin) {
+read_raw_total <- function(origin) {
   assert_that(inherits(origin, "Microsoft SQL Server"))
   "SELECT
   v.location_id, sa.location_id AS sublocation_id, v.id AS visit_id,
@@ -21,34 +22,44 @@ LEFT JOIN staging_Meetnetten.projects_projectspecies AS psp ON
   psp.species_id = o.species_id AND psp.project_id = p.id
 WHERE
   p.name = 'Vleermuizen - Wintertellingen' AND
-  pr.name = 'Vleermuizen - Wintertelling (totalen per kamer/sectie)' AND
+  pr.name = 'Vleermuizen - Wintertelling (totalen per telobject)' AND
   v.validation_status <> -1" |>
     dbGetQuery(conn = origin) |>
     filter(!.data$activity %in% c("awake", "dead", "flying")) -> raw_data
   raw_data |>
-    filter(!is.na(.data$species_id)) |>
-    count(.data$sample_id, .data$species_id) |>
-    filter(.data$n > 1) |>
-    inner_join(raw_data, by = "sample_id") |>
+    filter(.data$location_id != .data$sublocation_id) |>
     distinct(.data$visit_id) |>
     transmute(
       .data$visit_id,
-      problem = "multiple samples per species in section based protocol"
+      problem = "different sublocation and location in total based protocol"
+    ) |>
+    bind_rows(
+      raw_data |>
+        distinct(.data$visit_id, .data$not_counted) |>
+        count(.data$visit_id) |>
+        filter(.data$n > 1) |>
+        transmute(
+          .data$visit_id,
+          problem = "count and non-counted in total based protocol"
+        ),
+      raw_data |>
+        count(.data$visit_id, .data$species_id) |>
+        filter(.data$n > 1) |>
+        transmute(
+          .data$visit_id, problem = "duplicate species in total based protocol"
+        )
     ) -> problems
   raw_data |>
     anti_join(problems, by = "visit_id") -> raw_data
   raw_data |>
+    filter(!.data$not_counted) |>
     distinct(.data$visit_id, .data$location_id, .data$date) -> visits
   raw_data |>
-    filter(!.data$not_counted) |>
-    distinct(.data$sample_id, .data$visit_id, .data$sublocation_id) -> samples
-  raw_data |>
     filter(!is.na(.data$species_id)) |>
-    select("sample_id", "species_id", "number") -> observations
+    select("visit_id", "species_id", total = "number") -> observations
   return(
     list(
-      visits = visits, samples = samples, observations = observations,
-      problems = problems
+      visits = visits, observations = observations, problems = problems
     )
   )
 }

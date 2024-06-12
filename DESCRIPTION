@@ -13,7 +13,9 @@ URL: https://github.com/inbo/batanalysis
 BugReports: https://github.com/inbo/batanalysis/issues
 Imports: 
     assertthat,
-    DBI
+    DBI,
+    dplyr,
+    rlang
 Config/checklist/communities: inbo
 Config/checklist/keywords: hibernating bats; natura2000; habitat directive
 Encoding: UTF-8

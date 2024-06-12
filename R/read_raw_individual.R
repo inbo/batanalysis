@@ -2,7 +2,7 @@
 #' @param origin A `DBI` connection to the SQL Server database.
 #' @export
 #' @importFrom assertthat assert_that
-#' @importFrom dplyr anti_join count distinct filter
+#' @importFrom dplyr anti_join count distinct filter transmute
 #' @importFrom DBI dbGetQuery
 #' @importFrom rlang .data
 read_raw_individual <- function(origin) {
@@ -14,7 +14,7 @@ read_raw_individual <- function(origin) {
 FROM staging_Meetnetten.projects_project AS p
 INNER JOIN staging_Meetnetten.fieldwork_visit AS v ON v.project_id = p.id
 INNER JOIN staging_Meetnetten.protocols_protocol AS pr ON pr.id = v.protocol_id
-LEFT JOIN staging_Meetnetten.fieldwork_sample AS sa ON sa.visit_id = v.id
+INNER JOIN staging_Meetnetten.fieldwork_sample AS sa ON sa.visit_id = v.id
 LEFT JOIN staging_Meetnetten.fieldwork_observation AS o ON o.sample_id = sa.id
 LEFT JOIN staging_Meetnetten.species_activity AS a ON a.id = o.activity_id
 LEFT JOIN staging_Meetnetten.projects_projectspecies AS psp ON
@@ -26,9 +26,12 @@ WHERE
     dbGetQuery(conn = origin) -> raw_data
   raw_data |>
     filter(.data$number > 1) |>
-    distinct(.data$visit_id) -> wrong_protocol
+    distinct(.data$visit_id) |>
+    transmute(
+      .data$visit_id, problem = "number_min > 1 in individual based protocol"
+    ) -> problems
   raw_data |>
-    anti_join(wrong_protocol, by = "visit_id") |>
+    anti_join(problems, by = "visit_id") |>
     filter(!.data$activity %in% c("awake", "dead", "flying")) -> raw_data
   raw_data |>
     distinct(.data$visit_id, .data$location_id, .data$date) -> visits
@@ -41,7 +44,7 @@ WHERE
   return(
     list(
       visits = visits, samples = samples, observations = observations,
-      wrong_protocol = wrong_protocol
+      problems = problems
     )
   )
 }
