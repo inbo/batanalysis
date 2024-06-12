@@ -2,10 +2,13 @@
 
 export(get_project_id_hibernation)
 export(read_raw_individual)
+export(read_raw_section)
 importFrom(DBI,dbGetQuery)
 importFrom(assertthat,assert_that)
 importFrom(dplyr,anti_join)
 importFrom(dplyr,count)
 importFrom(dplyr,distinct)
 importFrom(dplyr,filter)
+importFrom(dplyr,inner_join)
+importFrom(dplyr,select)
 importFrom(rlang,.data)
