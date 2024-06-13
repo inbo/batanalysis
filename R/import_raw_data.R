@@ -15,6 +15,7 @@ import_raw_data <- function(origin, target) {
   section <- read_raw_section(origin = origin)
   total <- read_raw_total(origin = origin)
   species <- read_raw_species(origin = origin)
+  locations <- read_raw_location(origin = origin)
 
   visits <- bind_rows(individual$visits, section$visits)
   visits |>
@@ -80,6 +81,11 @@ WHERE
 
   write_vc(
     species, file = "hibernation/species", root = target, sorting = "id",
+    stage = TRUE, force = TRUE
+  )
+
+  write_vc(
+    locations, file = "hibernation/locations", root = target, sorting = "id",
     stage = TRUE, force = TRUE
   )
 

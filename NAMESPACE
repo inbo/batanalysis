@@ -3,6 +3,7 @@
 export(get_project_id_hibernation)
 export(import_raw_data)
 export(read_raw_individual)
+export(read_raw_location)
 export(read_raw_section)
 export(read_raw_species)
 export(read_raw_total)
