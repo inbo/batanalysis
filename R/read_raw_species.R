@@ -1,5 +1,5 @@
 #' Import the species list
-#' @param origin A `DBI` connection to the SQL Server database.
+#' @inheritParams import_raw_data
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom dplyr inner_join left_join select

@@ -1,5 +1,5 @@
 #' Import the raw observations according to the individual based protocol
-#' @param origin A `DBI` connection to the SQL Server database.
+#' @inheritParams import_raw_data
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom dplyr anti_join bind_rows count distinct filter transmute

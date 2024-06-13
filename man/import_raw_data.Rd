@@ -8,6 +8,8 @@ import_raw_data(origin, target)
 }
 \arguments{
 \item{origin}{A \code{DBI} connection to the SQL Server database.}
+
+\item{target}{A \code{git_repository} object to store the imported data.}
 }
 \description{
 Import the raw observations

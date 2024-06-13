@@ -1,5 +1,6 @@
 #' Import the raw observations
 #' @param origin A `DBI` connection to the SQL Server database.
+#' @param target A `git_repository` object to store the imported data.
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom DBI dbGetQuery
