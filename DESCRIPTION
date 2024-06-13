@@ -15,6 +15,7 @@ Imports:
     assertthat,
     DBI,
     dplyr,
+    git2rdata,
     rlang
 Config/checklist/communities: inbo
 Config/checklist/keywords: hibernating bats; natura2000; habitat directive

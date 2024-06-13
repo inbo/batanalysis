@@ -27,6 +27,8 @@ WHERE
     dbGetQuery(conn = origin) |>
     filter(!.data$activity %in% c("awake", "dead", "flying")) -> raw_data
   raw_data |>
+    distinct(.data$visit_id, .data$location_id, .data$date) -> raw_visit
+  raw_data |>
     filter(.data$location_id != .data$sublocation_id) |>
     distinct(.data$visit_id) |>
     transmute(
@@ -45,8 +47,16 @@ WHERE
       raw_data |>
         count(.data$visit_id, .data$species_id) |>
         filter(.data$n > 1) |>
+        distinct(.data$visit_id) |>
         transmute(
           .data$visit_id, problem = "duplicate species in total based protocol"
+        ),
+      raw_visit |>
+        count(.data$location_id, .data$date) |>
+        filter(.data$n > 1) |>
+        inner_join(raw_visit, by = c("location_id", "date")) |>
+        transmute(
+          .data$visit_id, problem = "duplicate visit in total based protocol"
         )
     ) -> problems
   raw_data |>

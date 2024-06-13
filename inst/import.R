@@ -7,3 +7,11 @@ sc <- c(
 sprintf("%s=%s;", names(sc), sc) |>
   paste(collapse = "") -> constring
 origin <- odbc::dbConnect(odbc::odbc(), .connection_string = constring)
+target <- "../batanalysis_data"
+if (file_test("-d", target)) {
+  target <- git2rdata::repository(target)
+} else {
+  dir.create(target)
+  target <- git2r::init(target)
+}
+import_raw_data(origin = origin, target = target)

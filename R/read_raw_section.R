@@ -2,7 +2,8 @@
 #' @param origin A `DBI` connection to the SQL Server database.
 #' @export
 #' @importFrom assertthat assert_that
-#' @importFrom dplyr anti_join count distinct filter inner_join select transmute
+#' @importFrom dplyr anti_join bind_rows count distinct filter inner_join select
+#' transmute
 #' @importFrom DBI dbGetQuery
 #' @importFrom rlang .data
 read_raw_section <- function(origin) {
@@ -26,6 +27,8 @@ WHERE
     dbGetQuery(conn = origin) |>
     filter(!.data$activity %in% c("awake", "dead", "flying")) -> raw_data
   raw_data |>
+    distinct(.data$visit_id, .data$location_id, .data$date) -> raw_visit
+  raw_data |>
     filter(!is.na(.data$species_id)) |>
     count(.data$sample_id, .data$species_id) |>
     filter(.data$n > 1) |>
@@ -34,6 +37,15 @@ WHERE
     transmute(
       .data$visit_id,
       problem = "multiple samples per species in section based protocol"
+    ) |>
+    bind_rows(
+      raw_visit |>
+        count(.data$location_id, .data$date) |>
+        filter(.data$n > 1) |>
+        inner_join(raw_visit, by = c("location_id", "date")) |>
+        transmute(
+          .data$visit_id, problem = "duplicate visit in section based protocol"
+        )
     ) -> problems
   raw_data |>
     anti_join(problems, by = "visit_id") -> raw_data
