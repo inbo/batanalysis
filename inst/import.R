@@ -15,3 +15,4 @@ if (file_test("-d", target)) {
   target <- git2r::init(target)
 }
 import_raw_data(origin = origin, target = target)
+DBI::dbDisconnect(origin)

@@ -14,6 +14,7 @@ import_raw_data <- function(origin, target) {
   individual <- read_raw_individual(origin = origin)
   section <- read_raw_section(origin = origin)
   total <- read_raw_total(origin = origin)
+  species <- read_raw_species(origin = origin)
 
   visits <- bind_rows(individual$visits, section$visits)
   visits |>
@@ -63,17 +64,24 @@ WHERE
 
   bind_rows(individual$observations, section$observations) |>
     semi_join(samples, by = "sample_id") |>
-    write_vc(
-      file = "hibernation/samples", root = target,
-      sorting = c("sample_id", "species_id"), stage = TRUE, force = TRUE
-    )
+    semi_join(species, by = c("species_id" = "id")) -> observations
+  write_vc(
+    observations, file = "hibernation/observations", root = target,
+    sorting = c("sample_id", "species_id"), stage = TRUE, force = TRUE
+  )
 
   total$observations |>
     semi_join(visits, by = "visit_id") |>
-    write_vc(
-      file = "hibernation/totals", root = target,
-      sorting = c("visit_id", "species_id"), stage = TRUE, force = TRUE
-    )
+    semi_join(species, by = c("species_id" = "id")) -> totals
+  write_vc(
+    totals, file = "hibernation/totals", root = target,
+    sorting = c("visit_id", "species_id"), stage = TRUE, force = TRUE
+  )
+
+  write_vc(
+    species, file = "hibernation/species", root = target, sorting = "id",
+    stage = TRUE, force = TRUE
+  )
 
   write_vc(
     problems, file = "hibernation/problems", sorting = c("visit_id", "problem"),
