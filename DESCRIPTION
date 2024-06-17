@@ -17,6 +17,8 @@ Imports:
     dplyr,
     git2rdata,
     rlang
+Suggests:
+    readr
 Config/checklist/communities: inbo
 Config/checklist/keywords: hibernating bats; natura2000; habitat directive
 Encoding: UTF-8
