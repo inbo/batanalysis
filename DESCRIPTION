@@ -16,7 +16,10 @@ Imports:
     DBI,
     dplyr,
     git2rdata,
-    rlang
+    lubridate,
+    purrr,
+    rlang,
+    tidyr
 Suggests:
     readr
 Config/checklist/communities: inbo

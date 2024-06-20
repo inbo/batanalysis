@@ -1,0 +1,76 @@
+#' Select the relevant data for the imputation model for a species
+#' @inheritParams import_raw_data
+#' @param species the ID of the species
+#' @param start The oldest date to use in the analysis
+#' @param n_winter Minimum number of winters in which the species is observed at
+#' a location.
+#' Remove locations with a number below this threshold.
+#' @export
+#' @importFrom assertthat assert_that is.count is.date is.string noNA
+#' @importFrom dplyr bind_rows distinct filter group_by inner_join left_join
+#' mutate n_distinct select semi_join slice_min summarise transmute
+#' @importFrom git2rdata read_vc
+#' @importFrom lubridate round_date year
+#' @importFrom purrr map2
+#' @importFrom rlang .data syms !!!
+#' @importFrom tidyr complete nesting replace_na unnest
+select_imputation_section <- function(
+  target, species = "Mmysbra", start = as.Date("2011-07-01"), n_winter = 2
+) {
+  assert_that(
+    inherits(target, "git_repository"), is.string(species), noNA(species),
+    is.date(start), noNA(start), is.count(n_winter), noNA(n_winter)
+  )
+  read_vc("hibernation/species", root = target) |>
+    select("code", "id", "parent") -> species_list
+  species_list |>
+    filter(.data$code == species) -> relevant_species
+  species_list |>
+    semi_join(relevant_species, by = c("parent" = "id")) -> extra_species
+  while (nrow(extra_species)) {
+    relevant_species <- bind_rows(relevant_species, extra_species)
+    species_list |>
+      semi_join(extra_species, by = c("parent" = "id")) -> extra_species
+  }
+  read_vc("hibernation/visits", root = target) |>
+    filter(.data$date >= start) |>
+    mutate(
+      winter = round_date(.data$date, unit = "year"),
+      delta = abs(
+        as.POSIXct(.data$winter) + (14 * 24 + 9) * 3600 - as.POSIXct(.data$date)
+      ),
+      winter = year(.data$winter)
+    ) |>
+    slice_min(.data$delta, n = 1, by = c("location_id", "winter")) |>
+    select(-"delta", -"date") -> visits
+  visits |>
+    inner_join(
+      read_vc("hibernation/samples", root = target), by = "visit_id"
+    ) |>
+    left_join(
+      read_vc("hibernation/observations", root = target) |>
+        mutate(
+          number = ifelse(
+            .data$species_id %in% relevant_species$id, .data$number, 0
+          )
+        ) |>
+        group_by(.data$sample_id) |>
+        summarise(number = sum(.data$number)),
+      by = "sample_id"
+    ) |>
+    mutate(number = replace_na(.data$number, 0)) |>
+    complete(
+      .data$winter, nesting(!!!syms(c("location_id", "sublocation_id")))
+    ) -> observations
+  # remove locations with less than n_winter observed winters
+  observations |>
+    filter(.data$number > 0) |>
+    group_by(.data$location_id) |>
+    summarise(winters = n_distinct(.data$winter)) |>
+    filter(.data$winters >= n_winter) |>
+    semi_join(x = observations, by = "location_id") |>
+    left_join(
+      read_vc("hibernation/cluster_location", root = target),
+      by = c("location_id" = "id")
+    )
+}
