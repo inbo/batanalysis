@@ -1,0 +1,200 @@
+---
+title: "Clustering of hibernacula"
+author: "Thierry Onkelinx"
+params:
+  target: "../../../batanalysis_data"
+  max_dist: 1000
+format: html
+---
+
+```{r setup}
+library(cluster)
+library(git2rdata)
+library(leaflet)
+library(lubridate)
+library(sf)
+library(tidyverse)
+target <- repository(params$target)
+```
+
+```{r read-location}
+read_vc("hibernation/locations", root = target) |>
+  filter(.data$parent_id == -1) |>
+  left_join(
+    read_vc("hibernation/cluster_location", root = target), by = "id"
+  ) |>
+  left_join(read_vc("hibernation/cluster", root = target), by = "cluster") |>
+  select(-"parent_id") |>
+  mutate(
+    rn = row_number(),
+    label = sprintf(
+      "id: %i\ncode: %s\nnaam: %s", .data$id, .data$code, .data$name
+    )
+  ) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) -> location_ll
+read_vc("hibernation/visits", root = target) |>
+  mutate(
+    winter = round_date(.data$date, unit = "year"),
+    delta = abs(
+      as.POSIXct(.data$winter) + (14 * 24 + 9) * 3600 - as.POSIXct(.data$date)
+    ),
+    winter = year(.data$winter)
+  ) |>
+  group_by(.data$location_id, .data$winter) |>
+  slice_min(.data$delta, n = 1) |>
+  ungroup() -> visits
+read_vc("hibernation/samples", root = target) |>
+  left_join(
+    read_vc("hibernation/observations", root = target), by = "sample_id"
+  ) |>
+  complete(.data$visit_id, .data$species_id, fill = list(number = 0)) |>
+  group_by(.data$visit_id, .data$species_id) |>
+  summarise(total = sum(.data$number), .groups = "drop") |>
+  bind_rows(
+    read_vc("hibernation/totals", root = target) |>
+      complete(.data$visit_id, .data$species_id, fill = list(total = 0))
+  ) |>
+  inner_join(visits, by = "visit_id") -> obs
+read_vc("hibernation/species", root = target) |>
+  filter(
+    .data$scientific_name %in% c(
+      "Myotis daubentonii", "Myotis mystacinus", "Myotis emarginatus",
+      "Myotis mystacinus/brandtii", "Myotis nattereri", "Myotis brandtii",
+      "Myotis dasycneme"
+    )
+  ) |>
+  transmute(
+    .data$id, species = ifelse(.data$parent == 546, "Mmysbra", .data$code)
+  ) -> relevant_species
+```
+
+```{r naive-cluster}
+location_ll |>
+  mutate(
+    naive = location_ll |>
+      st_transform(crs = 31370) |>
+      st_coordinates() |>
+      dist() |>
+      agnes(method = "complete") |>
+      as.hclust() |>
+      cutree(h = params$max_dist)
+  ) |>
+  add_count(.data$naive, name = "n_naive") -> naive_ll
+naive_ll |>
+  st_drop_geometry() |>
+  inner_join(obs, by = c("id" = "location_id")) |>
+  inner_join(relevant_species, by = c("species_id" = "id")) |>
+  group_by(.data$naive, .data$species, .data$winter) |>
+  summarise(total = sum(.data$total), .groups = "drop_last") |>
+  summarise(
+    winters = sum(.data$total > 0), max = max(.data$total),
+    .groups = "drop_last"
+  ) |>
+  filter(.data$winters > 1) |>
+  mutate(
+    label = sprintf("%s (%i/%i)", .data$species, .data$winters, .data$max)
+  ) |>
+  arrange(desc(.data$winters), desc(.data$max)) |>
+  summarise(label = paste(.data$label, collapse = "; ")) -> relevant_naive
+```
+
+The cluster labels displays the species code followed by two numbers between brackets.
+The first number is the number of winters in which the species was observed at the cluster level.
+The second number is the maximum number of observed individuals during a winter at the cluster level.
+We consider only _Myotis daubentonii_, _M. natterri_, _M. mystacinus/brandtii_, _M. emarginatus_ and _M. dasycneme_.
+A cluster is relevant for a species when the species was found during at least two winters at the cluster level.
+
+```{r fig-naive-cluster}
+#| fig-cap: Clustering based on largest distance between objects within the
+#|   cluster.
+factpal <- colorFactor(c("green", "red"), c(FALSE, TRUE))
+leaflet(naive_ll) |>
+  addTiles() |>
+  addPolygons(
+    data = naive_ll |>
+      group_by(.data$naive) |>
+      summarise(geometry = st_union(.data$geometry)) |>
+      ungroup() |>
+      st_convex_hull() |>
+      left_join(relevant_naive, by = "naive") |>
+      mutate(irrelevant = is.na(.data$label)),
+    label = ~label, color = ~factpal(irrelevant)
+  ) |>
+  addMarkers(group = "object", label = ~label) |>
+  groupOptions("object", zoomLevels = 14:20)
+```
+
+```{r fig-huidig}
+#| fig-cap: Current clusters.
+location_ll |>
+  filter(!is.na(.data$cluster)) |>
+  leaflet() |>
+  addTiles() |>
+  addPolygons(
+    data = location_ll |>
+      filter(!is.na(.data$cluster)) |>
+      group_by(.data$cluster) |>
+      summarise(geometry = st_union(.data$geometry)) |>
+      ungroup() |>
+      st_convex_hull(),
+    label = ~cluster
+  ) |>
+  addMarkers(group = "object", label = ~label) |>
+  groupOptions("object", zoomLevels = 14:20)
+```
+
+```{r alt-cluster}
+ignore_id <- c(20701, 20567)
+location_ll |>
+  filter(is.na(.data$cluster) | .data$id %in% ignore_id) -> to_cluster
+to_cluster |>
+  mutate(
+    cluster = to_cluster |>
+      st_transform(crs = 31370) |>
+      st_coordinates() |>
+      dist() |>
+      agnes(method = "complete") |>
+      as.hclust() |>
+      cutree(h = params$max_dist),
+    cluster = -.data$cluster
+  ) |>
+  bind_rows(
+    location_ll |>
+      filter(!is.na(.data$cluster), !.data$id %in% ignore_id)
+  ) -> alt_cluster
+ alt_cluster |>
+  st_drop_geometry() |>
+  inner_join(obs, by = c("id" = "location_id")) |>
+  inner_join(relevant_species, by = c("species_id" = "id")) |>
+  group_by(.data$cluster, .data$species, .data$winter) |>
+  summarise(total = sum(.data$total), .groups = "drop_last") |>
+  summarise(
+    winters = sum(.data$total > 0), max = max(.data$total),
+    .groups = "drop_last"
+  ) |>
+  filter(.data$winters > 1) |>
+  mutate(
+    label = sprintf("%s (%i/%i)", .data$species, .data$winters, .data$max)
+  ) |>
+  arrange(desc(.data$winters), desc(.data$max)) |>
+  summarise(label = paste(.data$label, collapse = "; ")) -> relevant_alt
+```
+
+```{r fig-alt-cluster}
+#| fig-cap: Alternative clustering based on updated current clustering,
+#|   combined with the unclustered objects.
+leaflet(alt_cluster) |>
+  addTiles() |>
+  addPolygons(
+    data = alt_cluster |>
+      group_by(.data$cluster) |>
+      summarise(geometry = st_union(.data$geometry)) |>
+      ungroup() |>
+      st_convex_hull() |>
+      left_join(relevant_alt, by = "cluster") |>
+      mutate(irrelevant = is.na(.data$label)),
+    label = ~label, color = ~factpal(irrelevant)
+  ) |>
+  addMarkers(group = "object", label = ~label) |>
+  groupOptions("object", zoomLevels = 14:20)
+```
