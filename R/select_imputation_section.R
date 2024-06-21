@@ -1,4 +1,7 @@
-#' Select the relevant data for the imputation model for a species
+#' Select the relevant data for the imputation model for a species by section.
+#'
+#' Use only the data collected using the individual based or section based
+#' protocols.
 #' @inheritParams import_raw_data
 #' @param species the ID of the species
 #' @param start The oldest date to use in the analysis
@@ -15,7 +18,7 @@
 #' @importFrom rlang .data syms !!!
 #' @importFrom tidyr complete nesting replace_na unnest
 select_imputation_section <- function(
-  target, species = "Mmysbra", start = as.Date("2011-07-01"), n_winter = 2
+  target, species = "Mmysbra", start = Sys.Date() - 12 * 365, n_winter = 2
 ) {
   assert_that(
     inherits(target, "git_repository"), is.string(species), noNA(species),
@@ -60,7 +63,8 @@ select_imputation_section <- function(
     ) |>
     mutate(number = replace_na(.data$number, 0)) |>
     complete(
-      .data$winter, nesting(!!!syms(c("location_id", "sublocation_id")))
+      winter = min(.data$winter):max(.data$winter),
+      nesting(!!!syms(c("location_id", "sublocation_id")))
     ) -> observations
   # remove locations with less than n_winter observed winters
   observations |>

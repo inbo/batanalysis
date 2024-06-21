@@ -2,12 +2,12 @@
 % Please edit documentation in R/select_imputation_section.R
 \name{select_imputation_section}
 \alias{select_imputation_section}
-\title{Select the relevant data for the imputation model for a species}
+\title{Select the relevant data for the imputation model for a species by section.}
 \usage{
 select_imputation_section(
   target,
   species = "Mmysbra",
-  start = as.Date("2011-07-01"),
+  start = Sys.Date() - 12 * 365,
   n_winter = 2
 )
 }
@@ -23,5 +23,6 @@ a location.
 Remove locations with a number below this threshold.}
 }
 \description{
-Select the relevant data for the imputation model for a species
+Use only the data collected using the individual based or section based
+protocols.
 }
