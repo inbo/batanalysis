@@ -101,7 +101,8 @@ naive_ll |>
 The cluster labels displays the species code followed by two numbers between brackets.
 The first number is the number of winters in which the species was observed at the cluster level.
 The second number is the maximum number of observed individuals during a winter at the cluster level.
-We consider only _Myotis daubentonii_, _M. natterri_, _M. mystacinus/brandtii_, _M. emarginatus_ and _M. dasycneme_.
+We consider only
+_Myotis daubentonii_, _M. natterri_, _M. mystacinus/brandtii_, _M. emarginatus_ and _M. dasycneme_. <!-- spell-check: ignore-->
 A cluster is relevant for a species when the species was found during at least two winters at the cluster level.
 
 ```{r fig-naive-cluster}
