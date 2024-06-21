@@ -4,7 +4,10 @@ author: "Thierry Onkelinx"
 params:
   target: "../../../batanalysis_data"
   max_dist: 1000
-format: html
+format:
+  html:
+    embed-resources: true
+    standalone: true
 ---
 
 ```{r setup}

@@ -11,6 +11,9 @@
 ^codecov\.yml$
 ^data-raw$
 ^docs$
+^inst/*.html$
+^inst/*_cache$
+^inst/*_files$
 ^man-roxygen$
 ^organisation.yml$
 ^pkgdown$

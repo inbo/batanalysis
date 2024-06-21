@@ -1,0 +1,169 @@
+---
+title: "Exploratory data analysis"
+author: "Thierry Onkelinx"
+params:
+  target: ../../../batanalysis_data
+  species: Mdau
+  start: 1994-07-01
+execute:
+  echo: false
+  warning: false
+format:
+  html:
+    embed-resources: true
+    standalone: true
+---
+
+```{r setup}
+library(batanalysis)
+library(git2rdata)
+library(scales)
+library(tidyverse)
+target <- repository(params$target)
+```
+
+```{r species, results = "asis"}
+read_vc("hibernation/species", root = target) |>
+  filter(.data$code == params$species) |>
+  transmute(
+    title = sprintf("%s (_%s_)", .data$name, .data$scientific_name)
+  ) -> this_species
+cat("#", this_species$title)
+```
+
+## Definition
+
+- single visit per winter per location.
+  Using the one nearest to January 15 in case of multiple visits in a winter at a location.
+- cluster status:
+    - known cluster: location is listed in the cluster information.
+    - unknown cluster: location is not listed in the cluster information.
+- type:
+  - missing: no observations available
+  - detailed:
+      - in case of a location with sections: observations using the individual based or section based protocols available
+      - in case of a location without sections: observations using the totals based protocols available
+  - total:
+      - location without sections using the totals based protocol
+
+## Overview
+
+```{r read-imputation}
+sections <- select_imputation_section(
+  target = target, species = params$species, start = as.Date(params$start)
+)
+totals <- select_imputation_total(
+  target = target, species = params$species, start = as.Date(params$start)
+)
+```
+
+```{r fig-total-location}
+#| fig-cap: Observed total number by location using the individual based and
+#|   section based protocols, or total based protocol on locations without
+#|   sublocation. The lines connect points from the same location.
+sections |>
+  filter(!is.na(.data$number)) |>
+  group_by(.data$winter, .data$cluster, .data$location_id) |>
+  summarise(total = sum(.data$number), .groups = "drop") -> section_total
+sections |>
+  filter(is.na(.data$number)) |>
+  distinct(.data$winter, .data$cluster, .data$location_id) |>
+  anti_join(section_total, by = c("winter", "cluster", "location_id")) |>
+  bind_rows(section_total) -> section_total
+totals |>
+  filter(!is.na(.data$minimum)) |>
+  select(-"total") |>
+  left_join(x = section_total, by = c("location_id", "winter", "cluster")) |>
+  bind_rows(
+    totals |>
+      anti_join(section_total, by = c("location_id", "winter"))
+  ) |>
+  mutate(
+    minimum = ifelse(!is.na(.data$total), .data$total, .data$minimum),
+    type = ifelse(
+      is.na(.data$minimum), 0, ifelse(is.na(.data$total), 1, 2)
+    ) |>
+      factor(levels = 0:2, labels = c("missing", "total", "detailed")),
+    clustered = factor(
+      is.na(.data$cluster), levels = c(TRUE, FALSE),
+      labels = c("unknown cluster", "known cluster")
+    )
+  ) |>
+  complete(
+    nesting(clustered, cluster, location_id), .data$winter,
+    fill = list(type = "missing")
+  ) -> section_total
+section_total |>
+  mutate(minimum = replace_na(.data$minimum, 0)) |>
+  ggplot(aes(x = winter, y = minimum)) +
+  geom_line(aes(group = location_id), alpha = 0.1) +
+  geom_point(aes(colour = type)) +
+  scale_y_continuous("total per location") +
+  facet_wrap(~clustered, scales = "free_y")
+```
+
+```{r fig-overview}
+#| fig-cap: Overview of available data by location and year.
+#| fig-height: 14
+section_total |>
+  distinct(.data$location_id, .data$type) |>
+  slice_max(.data$type, n = 1, by = "location_id") |>
+  semi_join(x = section_total, by = c("location_id", "type")) |>
+  group_by(.data$location_id) |>
+  summarise(
+    first = min(.data$winter), last = max(.data$winter), winters = n()
+  ) |>
+  arrange(.data$first, .data$last, .data$winters) -> location_order
+section_total |>
+  filter(.data$type != "missing") |>
+  mutate(
+    location_id = factor(.data$location_id, levels = location_order$location_id)
+  ) |>
+  ggplot(aes(x = winter, y = location_id, colour = type)) +
+  geom_point() +
+  facet_wrap(~clustered, scales = "free_y") +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+```
+
+```{r fig-total-year}
+#| fig-cap: Yearly total of number of individuals.
+section_total |>
+  group_by(.data$winter, .data$clustered, .data$type) |>
+  summarise(
+    detailed = sum(.data$total, na.rm = TRUE), n = n(), .groups = "drop",
+    minimum = sum(.data$minimum, na.rm = TRUE)
+  ) |>
+  complete(
+    .data$winter, .data$clustered, .data$type,
+    fill = list(detailed = 0, n = 0, minimum = 0)
+  ) -> section_total_year
+section_total_year |>
+  filter(.data$type != "missing") |>
+  arrange(desc(.data$type)) |>
+  group_by(.data$winter, .data$clustered) |>
+  mutate(
+    minimum = cumsum(.data$minimum),
+    type = ifelse(.data$type == "detailed", "detailed\nonly", "total")
+  ) |>
+  ggplot(aes(x = winter, y = minimum, colour = clustered, linetype = type)) +
+  geom_line() +
+  scale_y_continuous("total number of individuals")
+```
+
+```{r fig-location-year}
+#| fig-cap: Number of locations per year.
+section_total_year |>
+  ggplot(aes(x = winter, y = n, colour = clustered, linetype = type)) +
+  geom_line() +
+  scale_y_continuous("number of locations")
+```
+
+```{r fig-location-year-prop}
+#| fig-cap: Proportions of locations per year and per type.
+section_total_year |>
+  group_by(.data$winter, .data$clustered) |>
+  transmute(.data$type, proportion = .data$n / sum(.data$n)) |>
+  ggplot(aes(x = winter, y = proportion, colour = clustered, linetype = type)) +
+  geom_line() +
+  scale_y_continuous(labels = percent)
+```
