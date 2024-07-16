@@ -5,6 +5,8 @@ params:
   target: ../../../batanalysis_data
   species: Mdau
   start: 1994-07-01
+  n_surveyed: 4
+  n_observed: 3
 execute:
   echo: false
   warning: false
@@ -16,10 +18,14 @@ format:
 
 ```{r setup}
 library(batanalysis)
+library(DT)
 library(git2rdata)
+library(INBOtheme)
+library(knitr)
 library(scales)
 library(tidyverse)
 target <- repository(params$target)
+conflicted::conflicts_prefer(dplyr::filter)
 ```
 
 ```{r species, results = "asis"}
@@ -33,6 +39,7 @@ cat("#", this_species$title)
 
 ## Definition
 
+- all available data since `r params$start`.
 - single visit per winter per location.
   Using the one nearest to January 15 in case of multiple visits in a winter at a location.
 - cluster status:
@@ -50,11 +57,13 @@ cat("#", this_species$title)
 
 ```{r read-imputation}
 sections <- select_imputation_section(
-  target = target, species = params$species, start = as.Date(params$start)
+  target = target, species = params$species, start = as.Date(params$start),
+  n_winter = 1
 )
 totals <- select_imputation_total(
   target = target, species = params$species, start = as.Date(params$start)
 )
+read_vc("hibernation/locations", root = target) -> locations
 ```
 
 ```{r fig-total-location}
@@ -83,23 +92,17 @@ totals |>
     type = ifelse(
       is.na(.data$minimum), 0, ifelse(is.na(.data$total), 1, 2)
     ) |>
-      factor(levels = 0:2, labels = c("missing", "total", "detailed")),
-    clustered = factor(
-      is.na(.data$cluster), levels = c(TRUE, FALSE),
-      labels = c("unknown cluster", "known cluster")
-    )
+      factor(levels = 0:2, labels = c("missing", "total", "detailed"))
   ) |>
   complete(
-    nesting(clustered, cluster, location_id), .data$winter,
-    fill = list(type = "missing")
+    location_id, .data$winter, fill = list(type = "missing")
   ) -> section_total
 section_total |>
   mutate(minimum = replace_na(.data$minimum, 0)) |>
   ggplot(aes(x = winter, y = minimum)) +
   geom_line(aes(group = location_id), alpha = 0.1) +
   geom_point(aes(colour = type)) +
-  scale_y_continuous("total per location") +
-  facet_wrap(~clustered, scales = "free_y")
+  scale_y_continuous("total per location")
 ```
 
 ```{r fig-overview}
@@ -113,39 +116,58 @@ section_total |>
   summarise(
     first = min(.data$winter), last = max(.data$winter), winters = n()
   ) |>
-  arrange(.data$first, .data$last, .data$winters) -> location_order
+  arrange(.data$last, desc(.data$first), .data$winters) -> location_order
 section_total |>
   filter(.data$type != "missing") |>
   mutate(
-    location_id = factor(.data$location_id, levels = location_order$location_id)
+    location = factor(.data$location_id, levels = location_order$location_id)
   ) |>
-  ggplot(aes(x = winter, y = location_id, colour = type)) +
+  ggplot(aes(x = winter, y = location, colour = type)) +
   geom_point() +
-  facet_wrap(~clustered, scales = "free_y") +
   theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
 ```
+
+```{r estimate-survey-effort}
+last_winter <- max(section_total$winter)
+section_total |>
+  filter(.data$type == "detailed") |>
+  group_by(.data$location_id) |>
+  summarise(
+    surveyed_full = n(),
+    surveyed_last_24 = sum(last_winter - .data$winter <= 23),
+    surveyed_last_12 = sum(last_winter - .data$winter <= 11),
+    present_full = sum(.data$total > 0),
+    present_last_24 = sum(.data$total > 0 & last_winter - .data$winter <= 24),
+    present_last_12 = sum(.data$total > 0 & last_winter - .data$winter <= 11)
+  ) -> survey_effort
+```
+
+## Totals
 
 ```{r fig-total-year}
 #| fig-cap: Yearly total of number of individuals.
 section_total |>
-  group_by(.data$winter, .data$clustered, .data$type) |>
+  group_by(.data$winter, .data$type) |>
   summarise(
     detailed = sum(.data$total, na.rm = TRUE), n = n(), .groups = "drop",
     minimum = sum(.data$minimum, na.rm = TRUE)
   ) |>
   complete(
-    .data$winter, .data$clustered, .data$type,
+    .data$winter, .data$type,
     fill = list(detailed = 0, n = 0, minimum = 0)
   ) -> section_total_year
 section_total_year |>
   filter(.data$type != "missing") |>
   arrange(desc(.data$type)) |>
-  group_by(.data$winter, .data$clustered) |>
+  group_by(.data$winter) |>
   mutate(
     minimum = cumsum(.data$minimum),
-    type = ifelse(.data$type == "detailed", "detailed\nonly", "total")
+    type = factor(
+      .data$type, levels = c("total", "detailed"),
+      labels = c("total +\ndetailed", "detailed\nonly")
+    )
   ) |>
-  ggplot(aes(x = winter, y = minimum, colour = clustered, linetype = type)) +
+  ggplot(aes(x = winter, y = minimum, colour = type)) +
   geom_line() +
   scale_y_continuous("total number of individuals")
 ```
@@ -153,17 +175,257 @@ section_total_year |>
 ```{r fig-location-year}
 #| fig-cap: Number of locations per year.
 section_total_year |>
-  ggplot(aes(x = winter, y = n, colour = clustered, linetype = type)) +
+  mutate(
+    type = factor(.data$type, levels = c("detailed", "total", "missing"))
+  ) |>
+  ggplot(aes(x = winter, y = n, colour = type)) +
   geom_line() +
   scale_y_continuous("number of locations")
 ```
 
 ```{r fig-location-year-prop}
-#| fig-cap: Proportions of locations per year and per type.
+#| fig-cap: Evolution of proportions of locations by type.
 section_total_year |>
-  group_by(.data$winter, .data$clustered) |>
-  transmute(.data$type, proportion = .data$n / sum(.data$n)) |>
-  ggplot(aes(x = winter, y = proportion, colour = clustered, linetype = type)) +
+  group_by(.data$winter) |>
+  transmute(
+    type = factor(.data$type, levels = c("detailed", "total", "missing")),
+    proportion = .data$n / sum(.data$n)
+  ) |>
+  ggplot(aes(x = winter, y = proportion, colour = type)) +
   geom_line() +
   scale_y_continuous(labels = percent)
 ```
+
+## Effort during the last 24 year
+
+```{r fig-survey-effect-24-all}
+#| fig-cap: Overall survey effort during the last 24 year.
+survey_effort |>
+  count(.data$surveyed_last_24, .data$present_last_24) |>
+  ggplot(aes(x = surveyed_last_24, y = present_last_24)) +
+  geom_point(aes(colour = n)) +
+  labs(
+    x = "number of wintered surveyed", y = "number of winters observed",
+    title = "last 24 winters"
+  ) +
+  scale_colour_gradient("number of\nlocations", limits = c(0, NA))
+```
+
+```{r fig-survey-effect-24-relevant}
+#| fig-cap: Overall survey effort for the last 24 year for locations with a
+#|  minimum survey effort and a minimum number of observed winters.
+survey_effort |>
+  filter(
+    .data$surveyed_last_24 >= params$n_surveyed,
+    .data$present_last_24 >= params$n_observed
+  ) |>
+  count(.data$surveyed_last_24, .data$present_last_24) |>
+  ggplot(aes(x = surveyed_last_24, y = present_last_24)) +
+  geom_point(aes(colour = n)) +
+  labs(
+    x = "number of wintered surveyed", y = "number of winters observed",
+    title = "last 24 winters"
+  ) +
+  scale_colour_gradient("number of\nlocations", limits = c(0, NA))
+```
+
+### Usable locations
+
+```{r tbl-relevant-detail-24}
+#| tbl-cap: Locations with sufficient detailed surveys during the last 24 years.
+survey_effort |>
+  filter(.data$surveyed_last_24 >= params$n_surveyed) |>
+  left_join(
+    section_total |>
+      filter(.data$type == "total", last_winter - .data$winter <= 23) |>
+      group_by(.data$location_id) |>
+      summarise(total = n(), observed_total = sum(.data$total > 0)),
+    by = "location_id"
+  ) |>
+  inner_join(locations, by = c("location_id" = "id")) |>
+  transmute(
+    .data$location_id, .data$name,
+    `detailed surveys` = .data$surveyed_last_24,
+    `total surveys` =  replace_na(.data$total, 0),
+    observed = .data$present_last_24 + replace_na(.data$observed_total, 0)
+  ) |>
+  arrange(desc(.data$`detailed surveys`), desc(.data$observed)) |>
+  datatable(rownames = FALSE)
+```
+
+### Currently not-usable locations
+
+```{r tbl-missing-detail-24}
+#| tbl-cap: Locations with to few detailed surveys during the last 24 years
+#|   and additional totals during the last 24 years.
+survey_effort |>
+  filter(.data$surveyed_last_24 < params$n_surveyed) |>
+  inner_join(
+    section_total |>
+      filter(.data$type == "total", last_winter - .data$winter <= 23) |>
+      group_by(.data$location_id) |>
+      summarise(total = n(), observed_total = sum(.data$total > 0)),
+    by = "location_id"
+  ) |>
+  inner_join(locations, by = c("location_id" = "id")) |>
+  transmute(
+    .data$location_id, .data$name,
+    surveyed = .data$surveyed_last_24 + .data$total,
+    observed = .data$present_last_24 + .data$observed_total
+  ) |>
+  arrange(desc(.data$surveyed), desc(.data$observed)) |>
+  datatable(rownames = FALSE)
+```
+
+```{r tbl-missing-other-24}
+#| tbl-cap: Locations with to few detailed surveys during the last 24 years
+#|   and no additional totals.
+survey_effort |>
+  filter(.data$surveyed_last_24 < params$n_surveyed) |>
+  anti_join(
+    section_total |>
+      filter(.data$type == "total", last_winter - .data$winter <= 23),
+    by = "location_id"
+  ) |>
+  inner_join(locations, by = c("location_id" = "id")) |>
+  transmute(
+    .data$location_id, .data$name,
+    surveyed = .data$surveyed_last_12,
+    observed = .data$present_last_12
+  ) |>
+  arrange(desc(.data$observed), desc(.data$surveyed), .data$location_id) |>
+  datatable(rownames = FALSE)
+```
+
+
+## Effort during the last 12 year
+
+```{r fig-survey-effect-12-all}
+#| fig-cap: Overall survey effort during the last 12 year.
+survey_effort |>
+  count(.data$surveyed_last_12, .data$present_last_12) |>
+  ggplot(aes(x = surveyed_last_12, y = present_last_12)) +
+  geom_point(aes(colour = n)) +
+  labs(
+    x = "number of wintered surveyed", y = "number of winters observed",
+    title = "last 12 winters"
+  ) +
+  scale_colour_gradient("number of\nlocations", limits = c(0, NA))
+```
+
+```{r fig-survey-effect-12-relevant}
+#| fig-cap: Overall survey effort for the last 12 year for locations with a
+#|  minimum survey effort and a minimum number of observed winters.
+survey_effort |>
+  filter(
+    .data$surveyed_last_12 >= params$n_surveyed,
+    .data$present_last_12 >= params$n_observed
+  ) |>
+  count(.data$surveyed_last_12, .data$present_last_12) |>
+  ggplot(aes(x = surveyed_last_12, y = present_last_12)) +
+  geom_point(aes(colour = n)) +
+  labs(
+    x = "number of wintered surveyed", y = "number of winters observed",
+    title = "last 12 winters"
+  ) +
+  scale_colour_gradient("number of\nlocations", limits = c(0, NA))
+```
+
+### Usable locations
+
+```{r tbl-relevant-detail-12}
+#| tbl-cap: Locations with sufficient detailed surveys during the last 12 years.
+survey_effort |>
+  filter(
+    .data$surveyed_last_12 >= params$n_surveyed,
+    .data$present_last_12 >= params$n_observed
+  ) |>
+  left_join(
+    section_total |>
+      filter(.data$type == "total", last_winter - .data$winter <= 11) |>
+      group_by(.data$location_id) |>
+      summarise(total = n(), observed_total = sum(.data$total > 0)),
+    by = "location_id"
+  ) |>
+  inner_join(locations, by = c("location_id" = "id")) |>
+  transmute(
+    .data$location_id, .data$name,
+    `detailed surveys` = .data$surveyed_last_12,
+    `total surveys` =  replace_na(.data$total, 0),
+    observed = .data$present_last_12 + replace_na(.data$observed_total, 0)
+  ) |>
+  arrange(desc(.data$`detailed surveys`), desc(.data$observed)) |>
+  datatable(rownames = FALSE)
+```
+
+### Currently not usable locations
+
+```{r tbl-missing-detail-12}
+#| tbl-cap: Locations with to few detailed surveys during the last 12 years
+#|   and additional totals during the last 12 years.
+survey_effort |>
+  filter(.data$surveyed_last_12 < params$n_surveyed) |>
+  inner_join(
+    section_total |>
+      filter(.data$type == "total", last_winter - .data$winter <= 11) |>
+      group_by(.data$location_id) |>
+      summarise(total = n(), observed_total = sum(.data$total > 0)),
+    by = "location_id"
+  ) |>
+  inner_join(locations, by = c("location_id" = "id")) |>
+  transmute(
+    .data$location_id, .data$name,
+    surveyed = .data$surveyed_last_12 + .data$total,
+    observed = .data$present_last_12 + .data$observed_total
+  ) |>
+  arrange(desc(.data$surveyed), desc(.data$observed)) |>
+  datatable(rownames = FALSE)
+```
+
+```{r tbl-missing-other-12}
+#| tbl-cap: Locations with to few detailed surveys during the last 12 years
+#|   and no additional totals.
+survey_effort |>
+  filter(.data$surveyed_last_12 < params$n_surveyed) |>
+  anti_join(
+    section_total |>
+      filter(.data$type == "total", last_winter - .data$winter <= 11),
+    by = "location_id"
+  ) |>
+  inner_join(locations, by = c("location_id" = "id")) |>
+  transmute(
+    .data$location_id, .data$name,
+    surveyed = .data$surveyed_last_12,
+    observed = .data$present_last_12
+  ) |>
+  arrange(desc(.data$observed), desc(.data$surveyed), .data$location_id) |>
+  datatable(rownames = FALSE)
+```
+
+```{r}
+section_total |>
+  filter(max(.data$winter) - .data$winter <= 11) |>
+  count(.data$location_id, .data$type) |>
+  pivot_wider(
+    id_cols = "location_id", names_from = .data$type, values_from = .data$n
+  ) |>
+  mutate(
+    useable = as.integer(
+      !is.na(.data$detailed) & .data$detailed >= params$n_observed
+    )
+  ) |>
+  inner_join(locations, by = c("location_id" = "id")) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) -> effort_12
+pal_detailed <- colorNumeric(
+  palette = c(inbo_felrood, inbo_steun_blauw),
+  domain = c(0, 12)
+)
+pal_use <- colorBin(
+  palette = c(inbo_geel, inbo_hoofd),
+  domain = c(0, 1)
+)
+leaflet(effort_12) |>
+  addTiles() |>
+  addCircleMarkers(color = ~pal_use(useable), fillColor = ~pal_detailed(detailed))
+```
+
