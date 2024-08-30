@@ -24,17 +24,7 @@ select_imputation_section <- function(
     inherits(target, "git_repository"), is.string(species), noNA(species),
     is.date(start), noNA(start), is.count(n_winter), noNA(n_winter)
   )
-  read_vc("hibernation/species", root = target) |>
-    select("code", "id", "parent") -> species_list
-  species_list |>
-    filter(.data$code == species) -> relevant_species
-  species_list |>
-    semi_join(relevant_species, by = c("parent" = "id")) -> extra_species
-  while (nrow(extra_species)) {
-    relevant_species <- bind_rows(relevant_species, extra_species)
-    species_list |>
-      semi_join(extra_species, by = c("parent" = "id")) -> extra_species
-  }
+  relevant_species <- get_child_species(target = target, species = species)
   read_vc("hibernation/visits", root = target) |>
     filter(.data$date >= start) |>
     mutate(

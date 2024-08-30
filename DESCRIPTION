@@ -27,4 +27,4 @@ Config/checklist/keywords: hibernating bats; natura2000; habitat directive
 Encoding: UTF-8
 Language: en-GB
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
