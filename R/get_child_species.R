@@ -3,7 +3,7 @@
 #' @inheritParams select_imputation_section
 #' @export
 #' @importFrom assertthat assert_that is.string noNA
-#' @importFrom dplyr bind_rows filter nrow select semi_join
+#' @importFrom dplyr bind_rows filter select semi_join
 #' @importFrom git2rdata read_vc
 get_child_species <- function(target, species) {
   assert_that(
