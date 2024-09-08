@@ -1,9 +1,9 @@
-#' Convert raw data to analysis data
+#' Convert raw data to analysis data for a single species
 #' @param raw_data A gity repository with the raw data.
 #' @param analysis_data A gity repository to store the analysis data.
 #' @inheritParams select_imputation_section
 #' @export
-#' @importFrom assertthat assert_that is.count is.date is.string noNA
+#' @importFrom assertthat assert_that is.count is.number noNA
 #' @importFrom dplyr anti_join bind_rows distinct filter group_by inner_join
 #' mutate semi_join slice_min summarise ungroup
 #' @importFrom git2rdata read_vc update_metadata write_vc
@@ -224,5 +224,49 @@ Lambert 72 coordinate system expressed as kilometers.",
         Y = "Y coordinate of the location."
       )
     )
+}
 
+#' Convert raw data to analysis data for all species
+#' @inheritParams select_imputation_section
+#' @inheritParams prepare_analysis_data_species
+#' @export
+prepare_analysis_data <- function(
+  raw_data, analysis_data, start, n_winter = 4, n_present = 3
+) {
+  prepare_analysis_data_species(
+    raw_data = raw_data, analysis_data = analysis_data, start = start,
+    n_winter = n_winter, n_present = n_present, species = "Mbec"
+  )
+  prepare_analysis_data_species(
+    raw_data = raw_data, analysis_data = analysis_data, start = start,
+    n_winter = n_winter, n_present = n_present, species = "Mdas"
+  )
+  prepare_analysis_data_species(
+    raw_data = raw_data, analysis_data = analysis_data, start = start,
+    n_winter = n_winter, n_present = n_present, species = "Mdau"
+  )
+  prepare_analysis_data_species(
+    raw_data = raw_data, analysis_data = analysis_data, start = start,
+    n_winter = n_winter, n_present = n_present, species = "Mema"
+  )
+  prepare_analysis_data_species(
+    raw_data = raw_data, analysis_data = analysis_data, start = start,
+    n_winter = n_winter, n_present = n_present, species = "Mmysbra"
+  )
+  prepare_analysis_data_species(
+    raw_data = raw_data, analysis_data = analysis_data, start = start,
+    n_winter = n_winter, n_present = n_present, species = "Mmyo"
+  )
+  prepare_analysis_data_species(
+    raw_data = raw_data, analysis_data = analysis_data, start = start,
+    n_winter = n_winter, n_present = n_present, species = "Mnat"
+  )
+  prepare_analysis_data_species(
+    raw_data = raw_data, analysis_data = analysis_data, start = start,
+    n_winter = n_winter, n_present = n_present, species = "Pauraus"
+  )
+  prepare_analysis_data_species(
+    raw_data = raw_data, analysis_data = analysis_data, start = start,
+    n_winter = n_winter, n_present = n_present, species = "Pipspec"
+  )
 }

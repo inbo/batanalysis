@@ -19,6 +19,7 @@ Imports:
     lubridate,
     purrr,
     rlang,
+    sf,
     tidyr
 Suggests:
     readr
