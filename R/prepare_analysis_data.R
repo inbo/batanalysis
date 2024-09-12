@@ -133,13 +133,19 @@ dataset starts at %s.",
     bind_rows(
       dataset |>
         anti_join(duplicates, by = c("sublocation_id", "winter"))
+    ) |>
+    filter(.data$relevant > 0) |>
+    mutate(
+      sample_id = ifelse(
+        !is.na(.data$sample_id), .data$sample_id,
+        -.data$sublocation_id * 10000L - .data$winter
+      ),
+      across(c("location_id", "sublocation_id"), factor)
     ) -> dataset
 
   # remove rare sublocations
   dataset |>
-    filter(
-      0 < .data$relevant, .data$relevant < n_present, !is.na(.data$number)
-    ) |>
+    filter(.data$relevant < n_present, !is.na(.data$number)) |>
     select("location_id", "sublocation_id", "winter", "sample_id", "number") |>
     write_vc(
       file.path("hibernation", tolower(species), "rare_sublocation"),
@@ -174,15 +180,9 @@ starts at %s.",
   # store relevant data
   dataset |>
     select("location_id", "sublocation_id", "winter", "sample_id", "number") |>
-    mutate(
-      sample_id = ifelse(
-        !is.na(.data$sample_id), .data$sample_id,
-        -.data$sublocation_id * 10000L - .data$winter
-      )
-    ) |>
     write_vc(
       file.path("hibernation", tolower(species), "analysis_data"),
-      optimize = FALSE, root = analysis_data, stage = TRUE,
+      optimize = FALSE, root = analysis_data, stage = TRUE, strict = FALSE,
       sorting = c("location_id", "sublocation_id", "winter")
     )
   file.path("hibernation", tolower(species), "analysis_data") |>
