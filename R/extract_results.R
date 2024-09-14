@@ -7,7 +7,7 @@ extract_results.default <- function(x, ...) {
 }
 
 extract_results.character <- function(
-    x, base, project = "batanalysis", root, ...
+  x, base, project = "batanalysis", raw_data, root, ...
 ) {
   assert_that(is.string(x), noNA(x))
   manifest <- read_manifest(base = base, project = project, hash = x)
@@ -251,4 +251,124 @@ period",
       se = "The standard error of the estimate, also on the log-scale"
     )
   )
+}
+
+extract_results.n2kAggregate <- function(x, root, ...) {
+  assert_that(inherits(x, "n2kAggregate"))
+  x@AggregatedImputed@Covariate |>
+    bind_cols(x@AggregatedImputed@Imputation) |>
+    pivot_longer(
+      starts_with("Imputation"), names_to = "imputation", values_to = "total"
+    ) -> results
+  if (has_name(results, "count_location")) {
+    x@AnalysisMetadata |>
+      select(
+        species = "species_group_id", "model_type",
+        analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+      ) |>
+      bind_cols(
+        results |>
+          group_by(
+            winter = .data$count_winter, location = .data$count_location
+          ) |>
+          summarise(
+            mean = mean(.data$total, na.rm = TRUE),
+            min = min(.data$total, na.rm = TRUE),
+            p05 = quantile(.data$total, 0.05, na.rm = TRUE),
+            p20 = quantile(.data$total, 0.2, na.rm = TRUE),
+            p35 = quantile(.data$total, 0.35, na.rm = TRUE),
+            p50 = quantile(.data$total, 0.5, na.rm = TRUE),
+            p65 = quantile(.data$total, 0.65, na.rm = TRUE),
+            p80 = quantile(.data$total, 0.8, na.rm = TRUE),
+            p95 = quantile(.data$total, 0.95, na.rm = TRUE),
+            max = max(.data$total, na.rm = TRUE), .groups = "drop"
+          ) |>
+          mutate(location = as.integer(levels(.data$location))[.data$location])
+      ) |>
+      write_vc(
+        file = "hibernation/total_location", root = root, optimize = FALSE,
+        append = TRUE,
+        sorting = c("model_type", "species", "winter", "location", "analysis")
+      )
+    update_metadata(
+      file = "hibernation/total_location", root = root,
+      name = "hibernation_total_location",
+      title = "The imputed total number of hibernating bats per location",
+      description =
+"The imputed total number of hibernating bats in the winter season per locaion.
+Missing values are imputed before calculating the total. The model is a first
+order random walk on the winter season with a negative binomial distribution.",
+      field_description = c(
+        species = "The code of the species group",
+        model_type =
+          "A short description of the model used to calculate the totals",
+        analysis = "The file fingerprint of the analysis",
+        fingerprint = "The status fingerprint of the analysis",
+        winter = "The winter season defined by the year in which January falls",
+        mean = "The average of the imputed total number of hibernating bats",
+        min = "The minimum of the imputed total number of hibernating bats",
+        p05 = "The 5% quantile of the imputed total number of hibernating bats",
+      p20 = "The 20% quantile of the imputed total number of hibernating bats",
+      p35 = "The 35% quantile of the imputed total number of hibernating bats",
+      p50 = "The 50% quantile of the imputed total number of hibernating bats",
+      p65 = "The 65% quantile of the imputed total number of hibernating bats",
+      p80 = "The 80% quantile of the imputed total number of hibernating bats",
+      p95 = "The 95% quantile of the imputed total number of hibernating bats",
+        max = "The maximum of the imputed total number of hibernating bats"
+      )
+    )
+  } else {
+    x@AnalysisMetadata |>
+      select(
+        species = "species_group_id", "model_type",
+        analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+      ) |>
+      bind_cols(
+        results |>
+          group_by(winter = .data$count_winter) |>
+          summarise(
+            mean = mean(.data$total, na.rm = TRUE),
+            min = min(.data$total, na.rm = TRUE),
+            p05 = quantile(.data$total, 0.05, na.rm = TRUE),
+            p20 = quantile(.data$total, 0.2, na.rm = TRUE),
+            p35 = quantile(.data$total, 0.35, na.rm = TRUE),
+            p50 = quantile(.data$total, 0.5, na.rm = TRUE),
+            p65 = quantile(.data$total, 0.65, na.rm = TRUE),
+            p80 = quantile(.data$total, 0.8, na.rm = TRUE),
+            p95 = quantile(.data$total, 0.95, na.rm = TRUE),
+            max = max(.data$total, na.rm = TRUE)
+          )
+      ) |>
+      write_vc(
+        file = "hibernation/total", root = root, optimize = FALSE,
+        append = TRUE,
+        sorting = c("model_type", "species", "winter", "analysis")
+      )
+    update_metadata(
+      file = "hibernation/total", root = root, name = "hibernation_total",
+      title = "The imputed total number of hibernating bats",
+      description =
+"The imputed total number of hibernating bats in the winter season.
+Missing values are imputed before calculating the total. The model is a first
+order random walk on the winter season with a negative binomial distribution.",
+      field_description = c(
+        species = "The code of the species group",
+        model_type =
+          "A short description of the model used to calculate the totals",
+        analysis = "The file fingerprint of the analysis",
+        fingerprint = "The status fingerprint of the analysis",
+        winter = "The winter season defined by the year in which January falls",
+        mean = "The average of the imputed total number of hibernating bats",
+        min = "The minimum of the imputed total number of hibernating bats",
+      p05 = "The 5% quantile of the imputed total number of hibernating bats",
+      p20 = "The 20% quantile of the imputed total number of hibernating bats",
+      p35 = "The 35% quantile of the imputed total number of hibernating bats",
+      p50 = "The 50% quantile of the imputed total number of hibernating bats",
+      p65 = "The 65% quantile of the imputed total number of hibernating bats",
+      p80 = "The 80% quantile of the imputed total number of hibernating bats",
+      p95 = "The 95% quantile of the imputed total number of hibernating bats",
+        max = "The maximum of the imputed total number of hibernating bats"
+      )
+    )
+  }
 }
