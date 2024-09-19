@@ -292,7 +292,7 @@ number ~ 0 + intercept +
     nrow(comb) |>
       seq_len() |>
       rep(2) |>
-      sparseMatrix(
+      Matrix::sparseMatrix(
         j = c(as.integer(comb$winter2), as.integer(comb$winter1)),
         x = rep(c(1, -1), each = nrow(comb))
       ) |>

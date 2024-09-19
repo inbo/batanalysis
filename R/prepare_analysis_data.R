@@ -5,7 +5,7 @@
 #' @export
 #' @importFrom assertthat assert_that is.count is.number noNA
 #' @importFrom dplyr anti_join bind_cols bind_rows distinct filter group_by
-#' inner_join mutate semi_join slice_min summarise ungroup %>%
+#' inner_join mutate semi_join slice_min summarise ungroup
 #' @importFrom git2rdata read_vc update_metadata write_vc
 #' @importFrom rlang .data
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
@@ -30,6 +30,10 @@ prepare_analysis_data_species <- function(
   sections <- select_imputation_section(
     target = raw_data, species = species, start = as.Date(start), n_winter = 1
   )
+  read_vc("hibernation/locations", root = raw_data) |>
+    select(location_id = "id", "longitude", "latitude") |>
+    st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+    st_transform(crs = 31370) -> locations
   select_imputation_total(
     target = raw_data, species = species, start = as.Date(start)
   ) |>
@@ -38,13 +42,10 @@ prepare_analysis_data_species <- function(
     mutate(sublocation_id = .data$location_id) |>
     bind_rows(sections) |>
     select(-"cluster") |>
-    complete(.data$winter, nesting(location_id, sublocation_id)) |>
+    complete(.data$winter, nesting(location_id, sublocation_id)) |> # nolint: object_usage_linter
     inner_join(
-      read_vc("hibernation/locations", root = raw_data) |>
-        select(location_id = "id", "longitude", "latitude") |>
-        st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
-        st_transform(crs = 31370) %>%
-        bind_cols(st_coordinates(.) / 1000) |>
+      locations |>
+        bind_cols(st_coordinates(locations) / 1000) |>
         st_drop_geometry(),
       by = "location_id"
     ) |>
@@ -104,7 +105,7 @@ the location consist of a single sublocation.",
   write_vc(
     duplicates, file.path("hibernation", tolower(species), "duplicates"),
     optimize = FALSE, root = analysis_data,
-    sorting = c( "sublocation_id", "winter"), stage = TRUE
+    sorting = c("sublocation_id", "winter"), stage = TRUE
   )
   file.path("hibernation", tolower(species), "duplicates") |>
     update_metadata(
