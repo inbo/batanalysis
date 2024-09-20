@@ -22,7 +22,7 @@ LEFT JOIN staging_Meetnetten.projects_projectspecies AS psp ON
 WHERE
   p.name = 'Vleermuizen - Wintertellingen' AND
   pr.name = 'Vleermuizen - Wintertelling (per individu)' AND
-  v.validation_status <> -1" |>
+  v.validation_status <> -1 AND v.analysis = 1" |>
     dbGetQuery(conn = origin) -> raw_data
   raw_data |>
     distinct(.data$visit_id, .data$location_id, .data$date) -> raw_visit

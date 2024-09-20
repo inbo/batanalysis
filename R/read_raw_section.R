@@ -23,7 +23,7 @@ LEFT JOIN staging_Meetnetten.projects_projectspecies AS psp ON
 WHERE
   p.name = 'Vleermuizen - Wintertellingen' AND
   pr.name = 'Vleermuizen - Wintertelling (totalen per kamer/sectie)' AND
-  v.validation_status <> -1" |>
+  v.validation_status <> -1 AND v.analysis = 1" |>
     dbGetQuery(conn = origin) |>
     filter(!.data$activity %in% c("awake", "dead", "flying")) -> raw_data
   raw_data |>
