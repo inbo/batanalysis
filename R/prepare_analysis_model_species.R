@@ -7,7 +7,7 @@
 #' select slice_max
 #' @importFrom git2rdata recent_commit verify_vc
 #' @importFrom n2kanalysis n2k_aggregate n2k_hurdle_imputed n2k_model_imputed
-#' n2k_spde store_model
+#' n2k_spde spde store_model
 #' @importFrom rlang .data
 prepare_analysis_model_species <- function(
   analysis_data, base, species, max_dist = 10, project = "batanalysis",
@@ -29,7 +29,7 @@ prepare_analysis_model_species <- function(
   location |>
     select(-"location_id") |>
     as.data.frame() |>
-    spde(range = c(max_dist, 0.01), sigma = c(1, 0.01)) -> spde
+    spde(range = c(max_dist, 0.9), sigma = c(1, 0.01)) -> spde
   file.path("hibernation", tolower(species), "analysis_data") |>
     verify_vc(
       root = analysis_data,
@@ -84,7 +84,7 @@ present ~ 0 + intercept +
     data = data, result_datasource_id = "git", scheme_id = "hibernating bats",
     family = "binomial", species_group_id = species, spde = spde,
     location_group_id = "Flanders", seed = 19911204,
-    spde_prior = list(range = c(max_dist, 0.01), sigma = c(1, 0.01)),
+    spde_prior = list(range = c(max_dist, 0.9), sigma = c(1, 0.01)),
     first_imported_year = min(dataset$winter), analysis_date = rc$when,
     last_imported_year = max(dataset$winter), imputation_size = 100
   )
@@ -174,7 +174,7 @@ number ~ 0 + intercept +
     species_group_id = hurdle@AnalysisMetadata$species_group_id,
     location_group_id = hurdle@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter",
-    formula = "~count_winter", fun = sum, status = "waiting",
+    formula = "~winter", fun = sum, status = "waiting",
     parent = hurdle@AnalysisMetadata$file_fingerprint,
     first_imported_year = hurdle@AnalysisMetadata$first_imported_year,
     last_imported_year = hurdle@AnalysisMetadata$last_imported_year,
@@ -198,82 +198,16 @@ number ~ 0 + intercept +
       return(NULL)
     }
     stopifnot(requireNamespace("INLA", quietly = TRUE))
-    moving_trend <- function(n_year, trend_year, first_year) {
-      trend_year <- min(n_year, trend_year)
-      trend_coef <- seq_len(trend_year) - (trend_year + 1) / 2
-      trend_coef <- trend_coef / sum(trend_coef ^ 2)
-      lc <- vapply(
-        seq_len(n_year - trend_year + 1),
-        function(i) {
-          c(rep(0, i - 1), trend_coef, rep(0, n_year - trend_year - i + 1))
-        },
-        numeric(n_year)
-      )
-      colnames(lc) <- sprintf(
-        "trend_%.1f_%i",
-        first_year + seq_len(ncol(lc)) - 1 + (trend_year - 1) / 2,
-        trend_year
-      )
-      t(lc)
-    }
-    moving_average <- function(n_year, trend_year, first_year) {
-      trend_year <- min(n_year, trend_year)
-      vapply(
-        seq_len(n_year - trend_year + 1) - 1,
-        FUN.VALUE = vector(mode = "numeric", length = n_year),
-        FUN = function(i, trend_coef, n_year) {
-          c(rep(0, i), trend_coef, rep(0, n_year - length(trend_coef) - i))
-        }, trend_coef = rep(1 / trend_year, trend_year), n_year = n_year
-      ) |>
-        `colnames<-`(
-          sprintf(
-            "average_%.1f_%i",
-            first_year + seq_len(n_year - trend_year + 1) - 1 +
-              (trend_year - 1) / 2,
-            trend_year
-          )
-        ) |>
-        t()
-    }
-    moving_difference <- function(n_year, trend_year, first_year) {
-      trend_year <- min(floor(n_year / 2), trend_year)
-      list(seq_len(n_year - 2 * trend_year + 1) - 1) |>
-        rep(2) |>
-        expand.grid() -> extra_zero
-      extra_zero <- extra_zero[
-        rowSums(extra_zero) <= n_year - 2 * trend_year,
-      ]
-      vapply(
-        seq_len(nrow(extra_zero)),
-        FUN.VALUE = vector(mode = "numeric", length = n_year),
-        FUN = function(i, trend_coef, n_year, extra_zero) {
-          c(
-            rep(0, extra_zero[i, 1]), -trend_coef,
-            rep(0, n_year - 2 * length(trend_coef) - sum(extra_zero[i, ])),
-            trend_coef, rep(0, extra_zero[i, 2])
-          )
-        }, trend_coef = rep(1 / trend_year, trend_year), n_year = n_year,
-        extra_zero = extra_zero
-      ) |>
-        `colnames<-`(
-          sprintf(
-            "difference_%.1f_%.1f_%i",
-            first_year + extra_zero[, 1] + trend_year / 2,
-            first_year + n_year - 1 - trend_year / 2 - extra_zero[, 2],
-            trend_year
-          )
-        ) |>
-        t()
-    }
+    stopifnot(requireNamespace("n2kanalysis", quietly = TRUE))
     if (max(apply(model@AggregatedImputed@Imputation, 1, min)) < 5) {
       return(NULL)
     }
     apply(model@AggregatedImputed@Imputation, 1, max) |>
       aggregate(
-        by = model@AggregatedImputed@Covariate["count_winter"], FUN = max
+        by = model@AggregatedImputed@Covariate["winter"], FUN = max
       ) -> mi
-    mi <- mi[order(mi$count_winter), ]
-    winters <- mi$count_winter[cumsum(mi$x) > 0 & rev(cumsum(rev(mi$x))) > 0]
+    mi <- mi[order(mi$winter), ]
+    winters <- mi$winter[cumsum(mi$x) > 0 & rev(cumsum(rev(mi$x))) > 0]
     if (length(winters) < 5) {
       return(NULL)
     }
@@ -300,26 +234,29 @@ number ~ 0 + intercept +
       setNames("cwinter") |>
       INLA::inla.make.lincombs() |>
       setNames(comb$label) -> lc2
-    moving_trend(
-      n_year = length(winters), trend_year = 12, first_year = min(winters)
+    n2kanalysis::moving_trend(
+      n_year = length(winters), duration = 12, first_year = min(winters)
     ) |>
       rbind(
-        moving_difference(
-          n_year = length(winters), trend_year = 6,
-          first_year = min(winters)
+        n2kanalysis::moving_trend(
+          n_year = length(winters), duration = 10, first_year = min(winters)
+        ),
+        n2kanalysis::moving_trend(
+          n_year = length(winters), duration = 6, first_year = min(winters)
+        ),
+        n2kanalysis::moving_difference(
+          n_year = length(winters), duration = 6, first_year = min(winters)
         )
       ) |>
       unique() -> lc3
     INLA::inla.make.lincombs(cwinter = lc3) |>
       setNames(rownames(lc3)) -> lc3
-    moving_average(
-      n_year = length(winters), trend_year = 6,
-      first_year = min(winters)
+    n2kanalysis::moving_average(
+      n_year = length(winters), duration = 6, first_year = min(winters)
     ) |>
       rbind(
-        moving_average(
-          n_year = length(winters), trend_year = 12,
-          first_year = min(winters)
+        n2kanalysis::moving_average(
+          n_year = length(winters), duration = 12, first_year = min(winters)
         )
       ) -> ma
     list("(Intercept)" = rep(1, nrow(ma)), cwinter = ma) |>
@@ -346,7 +283,7 @@ number ~ 0 + intercept +
     seed = aggregated_tot@AnalysisMetadata$seed,
     package = c("INLA", "dplyr"),
     extractor = extractor_fun,
-    mutate = list(cwinter = "count_winter - max(count_winter)"),
+    mutate = list(cwinter = "winter + 1 - min(winter)"),
     model_args = list(family = "nbinomial", safe = FALSE, silent = TRUE),
     prepare_model_args = list(prepare_model_args_fun),
     parent = aggregated_tot@AnalysisMetadata$file_fingerprint
@@ -362,7 +299,7 @@ number ~ 0 + intercept +
     species_group_id = hurdle@AnalysisMetadata$species_group_id,
     location_group_id = hurdle@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter + location",
-    formula = "~count_winter + count_location", fun = sum, status = "waiting",
+    formula = "~winter + location", fun = sum, status = "waiting",
     parent = hurdle@AnalysisMetadata$file_fingerprint,
     first_imported_year = hurdle@AnalysisMetadata$first_imported_year,
     last_imported_year = hurdle@AnalysisMetadata$last_imported_year,

@@ -16,10 +16,14 @@ Imports:
     DBI,
     dplyr,
     git2rdata,
+    INLA,
     lubridate,
+    n2kanalysis,
     purrr,
     rlang,
     sf,
+    stringr,
+    tibble,
     tidyr
 Suggests:
     readr
