@@ -9,7 +9,8 @@ prepare_analysis_data(
   analysis_data,
   start,
   n_winter = 4,
-  n_present = 3
+  n_present = 3,
+  strict = TRUE
 )
 }
 \arguments{
@@ -22,6 +23,11 @@ prepare_analysis_data(
 \item{n_winter}{Minimum number of winters in which the species is observed at
 a location.
 Remove locations with a number below this threshold.}
+
+\item{strict}{What to do when the metadata changes. \code{strict = FALSE}
+overwrites the data and the metadata with a warning listing the changes,
+\code{strict = TRUE} returns an error and leaves the data and metadata as is.
+Defaults to \code{TRUE}.}
 }
 \description{
 Convert raw data to analysis data for all species

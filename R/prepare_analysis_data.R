@@ -2,6 +2,7 @@
 #' @param raw_data A gity repository with the raw data.
 #' @param analysis_data A gity repository to store the analysis data.
 #' @inheritParams select_imputation_section
+#' @inheritParams git2rdata::write_vc
 #' @export
 #' @importFrom assertthat assert_that is.count is.number noNA
 #' @importFrom dplyr anti_join bind_cols bind_rows distinct filter group_by
@@ -11,7 +12,8 @@
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
 #' @importFrom tidyr complete nesting
 prepare_analysis_data_species <- function(
-  raw_data, analysis_data, species, start, n_winter = 4, n_present = 3
+  raw_data, analysis_data, species, start, n_winter = 4, n_present = 3,
+  strict = TRUE
 ) {
   assert_that(
     is.number(start), is.count(n_winter), is.count(n_present), noNA(start),
@@ -71,7 +73,8 @@ prepare_analysis_data_species <- function(
     ) |>
     write_vc(
       file.path("hibernation", tolower(species), "too_short"), optimize = FALSE,
-      root = analysis_data, sorting = c("location_id", "winter"), stage = TRUE
+      root = analysis_data, sorting = c("location_id", "winter"), stage = TRUE,
+      strict = strict
     )
   file.path("hibernation", tolower(species), "too_short") |>
     update_metadata(
@@ -105,7 +108,7 @@ the location consist of a single sublocation.",
   write_vc(
     duplicates, file.path("hibernation", tolower(species), "duplicates"),
     optimize = FALSE, root = analysis_data,
-    sorting = c("sublocation_id", "winter"), stage = TRUE
+    sorting = c("sublocation_id", "winter"), stage = TRUE, strict = strict
   )
   file.path("hibernation", tolower(species), "duplicates") |>
     update_metadata(
@@ -150,7 +153,7 @@ dataset starts at %s.",
     select("location_id", "sublocation_id", "winter", "sample_id", "number") |>
     write_vc(
       file.path("hibernation", tolower(species), "rare_sublocation"),
-      optimize = FALSE, root = analysis_data, stage = TRUE,
+      optimize = FALSE, root = analysis_data, stage = TRUE, strict = strict,
       sorting = c("location_id", "sublocation_id", "winter")
     )
   file.path("hibernation", tolower(species), "rare_sublocation") |>
@@ -183,7 +186,7 @@ starts at %s.",
     select("location_id", "sublocation_id", "winter", "sample_id", "number") |>
     write_vc(
       file.path("hibernation", tolower(species), "analysis_data"),
-      optimize = FALSE, root = analysis_data, stage = TRUE, strict = FALSE,
+      optimize = FALSE, root = analysis_data, stage = TRUE, strict = strict,
       sorting = c("location_id", "sublocation_id", "winter")
     )
   file.path("hibernation", tolower(species), "analysis_data") |>
@@ -214,7 +217,7 @@ They are a combination of the sublocation_id and the winter.",
     distinct(.data$location_id, .data$X, .data$Y) |>
     write_vc(
       file.path("hibernation", tolower(species), "locations"),
-      optimize = FALSE, root = analysis_data, stage = TRUE,
+      optimize = FALSE, root = analysis_data, stage = TRUE, strict = strict,
       sorting = c("location_id", "X", "Y")
     )
   file.path("hibernation", tolower(species), "locations") |>
@@ -243,46 +246,56 @@ Lambert 72 coordinate system expressed as kilometers.",
 #' Convert raw data to analysis data for all species
 #' @inheritParams select_imputation_section
 #' @inheritParams prepare_analysis_data_species
+#' @inheritParams git2rdata::write_vc
 #' @importFrom git2rdata commit
 #' @export
 prepare_analysis_data <- function(
-  raw_data, analysis_data, start, n_winter = 4, n_present = 3
+  raw_data, analysis_data, start, n_winter = 4, n_present = 3, strict = TRUE
 ) {
   prepare_analysis_data_species(
     raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mbec"
+    n_winter = n_winter, n_present = n_present, species = "Mbec",
+    strict = strict
   )
   prepare_analysis_data_species(
     raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mdas"
+    n_winter = n_winter, n_present = n_present, species = "Mdas",
+    strict = strict
   )
   prepare_analysis_data_species(
     raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mdau"
+    n_winter = n_winter, n_present = n_present, species = "Mdau",
+    strict = strict
   )
   prepare_analysis_data_species(
     raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mema"
+    n_winter = n_winter, n_present = n_present, species = "Mema",
+    strict = strict
   )
   prepare_analysis_data_species(
     raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mmysbra"
+    n_winter = n_winter, n_present = n_present, species = "Mmysbra",
+    strict = strict
   )
   prepare_analysis_data_species(
     raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mmyo"
+    n_winter = n_winter, n_present = n_present, species = "Mmyo",
+    strict = strict
   )
   prepare_analysis_data_species(
     raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mnat"
+    n_winter = n_winter, n_present = n_present, species = "Mnat",
+    strict = strict
   )
   prepare_analysis_data_species(
     raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Pauraus"
+    n_winter = n_winter, n_present = n_present, species = "Pauraus",
+    strict = strict
   )
   prepare_analysis_data_species(
     raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Pipspec"
+    n_winter = n_winter, n_present = n_present, species = "Pipspec",
+    strict = strict
   )
   commit(
     message = "Automated commit from abvanalysis", repo = analysis_data,
