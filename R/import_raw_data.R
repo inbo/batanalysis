@@ -24,22 +24,23 @@ import_raw_data <- function(origin, target) {
     filter(.data$n > 1) |>
     inner_join(visits, by = c("location_id", "date")) |>
     transmute(
-      .data$visit_id,
+      .data$visit_id, .data$location_id,
       problem =
         "duplicate visits between individual and section based protocols"
     ) |>
     bind_rows(
+      total$problem, individual$problem, section$problem,
       total$visits |>
         semi_join(visits, by = c("location_id", "date")) |>
         transmute(
-          .data$visit_id,
+          .data$visit_id, .data$location_id,
           problem = paste(
             "duplicate visits between total based and individual or section",
             "based protocols"
           )
         ),
       "SELECT
-  v.id AS visit_id, 'visit without sample' AS problem
+  v.id AS visit_id, v.location_id, 'visit without sample' AS problem
 FROM staging_Meetnetten.projects_project AS p
 INNER JOIN staging_Meetnetten.fieldwork_visit AS v ON v.project_id = p.id
 INNER JOIN staging_Meetnetten.protocols_protocol AS pr ON pr.id = v.protocol_id

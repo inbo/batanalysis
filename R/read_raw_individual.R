@@ -28,9 +28,10 @@ WHERE
     distinct(.data$visit_id, .data$location_id, .data$date) -> raw_visit
   raw_data |>
     filter(.data$number > 1) |>
-    distinct(.data$visit_id) |>
+    distinct(.data$visit_id, .data$location_id) |>
     transmute(
-      .data$visit_id, problem = "number_min > 1 in individual based protocol"
+      .data$visit_id, .data$location_id,
+      problem = "number_min > 1 in individual based protocol"
     ) |>
     bind_rows(
       raw_visit |>
@@ -38,7 +39,7 @@ WHERE
         filter(.data$n > 1) |>
         inner_join(raw_visit, by = c("location_id", "date")) |>
         transmute(
-          .data$visit_id,
+          .data$visit_id, .data$location_id,
           problem = "duplicate visit in invididual based protocol"
         )
     ) -> problems

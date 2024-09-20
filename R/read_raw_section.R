@@ -33,9 +33,9 @@ WHERE
     count(.data$sample_id, .data$species_id) |>
     filter(.data$n > 1) |>
     inner_join(raw_data, by = "sample_id") |>
-    distinct(.data$visit_id) |>
+    distinct(.data$visit_id, .data$location_id) |>
     transmute(
-      .data$visit_id,
+      .data$visit_id, .data$location_id,
       problem = "multiple samples per species in section based protocol"
     ) |>
     bind_rows(
@@ -44,7 +44,8 @@ WHERE
         filter(.data$n > 1) |>
         inner_join(raw_visit, by = c("location_id", "date")) |>
         transmute(
-          .data$visit_id, problem = "duplicate visit in section based protocol"
+          .data$visit_id, .data$location_id,
+          problem = "duplicate visit in section based protocol"
         )
     ) -> problems
   raw_data |>

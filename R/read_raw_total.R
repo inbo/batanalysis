@@ -30,33 +30,35 @@ WHERE
     distinct(.data$visit_id, .data$location_id, .data$date) -> raw_visit
   raw_data |>
     filter(.data$location_id != .data$sublocation_id) |>
-    distinct(.data$visit_id) |>
+    distinct(.data$visit_id, .data$location_id) |>
     transmute(
-      .data$visit_id,
+      .data$visit_id, .data$location_id,
       problem = "different sublocation and location in total based protocol"
     ) |>
     bind_rows(
       raw_data |>
-        distinct(.data$visit_id, .data$not_counted) |>
-        count(.data$visit_id) |>
+        distinct(.data$visit_id, .data$not_counted, .data$location_id) |>
+        count(.data$visit_id, .data$location_id) |>
         filter(.data$n > 1) |>
         transmute(
-          .data$visit_id,
+          .data$visit_id, .data$location_id,
           problem = "count and non-counted in total based protocol"
         ),
       raw_data |>
-        count(.data$visit_id, .data$species_id) |>
+        count(.data$visit_id, .data$species_id, .data$location_id) |>
         filter(.data$n > 1) |>
-        distinct(.data$visit_id) |>
+        distinct(.data$visit_id, .data$location_id) |>
         transmute(
-          .data$visit_id, problem = "duplicate species in total based protocol"
+          .data$visit_id, .data$location_id,
+          problem = "duplicate species in total based protocol"
         ),
       raw_visit |>
         count(.data$location_id, .data$date) |>
         filter(.data$n > 1) |>
         inner_join(raw_visit, by = c("location_id", "date")) |>
         transmute(
-          .data$visit_id, problem = "duplicate visit in total based protocol"
+          .data$visit_id, .data$location_id,
+          problem = "duplicate visit in total based protocol"
         )
     ) -> problems
   raw_data |>
