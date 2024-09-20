@@ -1,39 +1,100 @@
+#' Extract results from a model
+#' @param x The model to extract results from
+#' @param ... Additional arguments passed to the extraction method
+#' @export
+#' @importFrom assertthat assert_that
 extract_results <- function(x, ...) {
   UseMethod("extract_results", x)
 }
 
+#' @export
 extract_results.default <- function(x, ...) {
   message("No extraction method for class ", class(x))
 }
 
+#' @export
+#' @importFrom assertthat assert_that is.string noNA
+#' @importFrom dplyr anti_join distinct
+#' @importFrom git2rdata verify_vc write_vc
+#' @importFrom n2kanalysis read_manifest read_model
+#' @importFrom purrr walk
+#'
 extract_results.character <- function(
   x, base, project = "batanalysis", raw_data, root, ...
 ) {
   assert_that(is.string(x), noNA(x))
-  manifest <- read_manifest(base = base, project = project, hash = x)
-  manifest@Manifest |>
-    filter(is.na(.data$parent)) |>
-    transmute(.data$fingerprint, level = 0) -> level
-  manifest@Manifest |>
-    anti_join(level, by = "fingerprint") -> to_do
-  while (nrow(to_do)) {
-    to_do |>
-      inner_join(level, by = c("parent" = "fingerprint")) |>
-      distinct(.data$fingerprint, level = .data$level + 1) |>
-      bind_rows(level) -> level
-    manifest@Manifest |>
-      anti_join(level, by = "fingerprint") -> to_do
+  verify_vc(
+    "hibernation/species", root = raw_data,
+    variables = c("id", "code", "name", "scientific_name", "parent")
+  ) |>
+    write_vc(
+      "hibernation/species", root = root, sorting = "id", optimize = FALSE
+    )
+  verify_vc(
+    "hibernation/locations", root = raw_data,
+    variables = c("id", "code", "name", "parent_id")
+  ) |>
+    write_vc(
+      "hibernation/locations", root = root, sorting = "id", optimize = FALSE
+    )
+  read_manifest(base = base, project = project, hash = x) |>
+    slot("Manifest") |>
+    distinct(.data$fingerprint) -> manifest
+  if (is_git2rdata("model_check/sublocation", root = root)) {
+    manifest |>
+      anti_join(
+        verify_vc("model_check/sublocation", root = root, "analysis"),
+        by = c("fingerprint" = "analysis")
+      ) -> manifest
   }
-  rm_data(root = root, path = "hibernation")
-  level |>
-    filter(level == 2) |>
-    slice(1) |>
-    pull(fingerprint) |>
-    read_model(base = base, project = project) -> x
+  if (is_git2rdata("hibernation/hurdle", root = root)) {
+    manifest |>
+      anti_join(
+        verify_vc("hibernation/hurdle", root = root, "analysis"),
+        by = c("fingerprint" = "analysis")
+      ) -> manifest
+  }
+  if (is_git2rdata("hibernation/total", root = root)) {
+    manifest |>
+      anti_join(
+        verify_vc("hibernation/total", root = root, "analysis"),
+        by = c("fingerprint" = "analysis")
+      ) -> manifest
+  }
+  if (is_git2rdata("hibernation/difference", root = root)) {
+    manifest |>
+      anti_join(
+        verify_vc("hibernation/difference", root = root, "analysis"),
+        by = c("fingerprint" = "analysis")
+      ) -> manifest
+  }
+  walk(
+    manifest$fingerprint,
+    ~read_model(.x, base = base, project = project) |>
+         extract_results(root = root)
+  )
+  return(invisible(NULL))
 }
 
+#' @export
+#' @importFrom assertthat assert_that
+#' @importFrom dplyr across bind_cols filter mutate select transmute
+#' @importFrom git2rdata is_git2rdata update_metadata write_vc
+#' @importFrom n2kanalysis get_file_fingerprint
+#' @importFrom stringr str_detect str_remove
+#' @importFrom tidyr separate_wider_regex
 extract_results.n2kModelImputed <- function(x, root, ...) {
   assert_that(inherits(x, "n2kModelImputed"))
+  message(get_file_fingerprint(x))
+  # skip if model is already in the database
+  if (is_git2rdata("hibernation/difference", root = root)) {
+    if (
+      get_file_fingerprint(x) %in%
+      read_vc("hibernation/difference", root = root)$analysis
+    ) {
+      return(invisible(NULL))
+    }
+  }
   x@AnalysisMetadata |>
     select(
       species = "species_group_id", "model_type", analysis = "file_fingerprint",
@@ -251,10 +312,32 @@ period",
       se = "The standard error of the estimate, also on the log-scale"
     )
   )
+  rm(x, results)
+  gc(verbose = FALSE)
+  return(invisible(NULL))
 }
 
+#' @export
+#' @importFrom assertthat assert_that
+#' @importFrom dplyr bind_cols group_by inner_join mutate select starts_with
+#' summarise
+#' @importFrom git2rdata is_git2rdata update_metadata write_vc
+#' @importFrom n2kanalysis get_file_fingerprint
+#' @importFrom rlang .data
+#' @importFrom stats quantile
+#' @importFrom tidyr pivot_longer
 extract_results.n2kAggregate <- function(x, root, ...) {
   assert_that(inherits(x, "n2kAggregate"))
+  message(get_file_fingerprint(x))
+  # skip if model is already in the database
+  if (is_git2rdata("hibernation/total", root = root)) {
+    if (
+      get_file_fingerprint(x) %in%
+      read_vc("hibernation/total", root = root)$analysis
+    ) {
+      return(invisible(NULL))
+    }
+  }
   x@AggregatedImputed@Covariate |>
     bind_cols(x@AggregatedImputed@Imputation) |>
     pivot_longer(
@@ -371,4 +454,397 @@ order random walk on the winter season with a negative binomial distribution.",
       )
     )
   }
+  rm(x, results)
+  gc(verbose = FALSE)
+  return(invisible(NULL))
+}
+
+#' @export
+#' @importFrom assertthat assert_that
+#' @importFrom dplyr arrange bind_cols distinct group_by inner_join mutate
+#' select starts_with summarise
+#' @importFrom git2rdata is_git2rdata update_metadata write_vc
+#' @importFrom INLA inla.mesh.projector inla.posterior.sample
+#' @importFrom n2kanalysis get_file_fingerprint spde2mesh
+#' @importFrom purrr map map2_dfc
+#' @importFrom stringr str_detect
+#' @importFrom stats quantile
+#' @importFrom tibble rownames_to_column
+#' @importFrom tidyr everything pivot_longer pivot_wider
+extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
+  assert_that(inherits(x, "n2kSpde"), is.count(n_sim), noNA(n_sim))
+  message(get_file_fingerprint(x))
+  # skip if model is not converged
+  if (n2kanalysis::status(x) != "converged") {
+    return(invisible(NULL))
+  }
+  # skip if model is already in the database
+  if (is_git2rdata("model_check/sublocation", root = root)) {
+    if (
+      get_file_fingerprint(x) %in%
+        read_vc("model_check/sublocation", root = root)$analysis
+    ) {
+      return(invisible(NULL))
+    }
+  }
+  # generate posterior sample
+  inla.posterior.sample(n = n_sim, result = x@Model) |>
+    map("latent") |>
+    map2_dfc(
+      seq_len(n_sim),
+      ~sprintf("sim_%04i", .y) |>
+        `colnames<-`(.x, value = _) |>
+        as.data.frame()
+    ) |>
+    rownames_to_column(var = "parameter") |>
+    pivot_longer(
+      -"parameter", names_to = "sim", values_to = "estimate"
+    ) -> post_sample
+  # extract the intercept and the cwinter effect
+  post_sample |>
+    filter(.data$parameter == "intercept:1") |>
+    select("sim", intercept = "estimate") -> ps_intercept
+  post_sample |>
+    filter(str_detect(.data$parameter, "cwinter")) |>
+    mutate(
+      cwinter = str_remove(.data$parameter, "cwinter:") |>
+        as.integer(),
+      .data$sim, .data$estimate
+    ) |>
+    inner_join(ps_intercept, by = "sim") |>
+    transmute(
+      .data$cwinter, .data$sim, estimate = .data$intercept + .data$estimate
+    ) -> ps_cwinter
+  x@AnalysisMetadata |>
+    select(
+      species = "species_group_id", "model_type",
+      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+    ) |>
+    bind_cols(
+      ps_cwinter |>
+        group_by(.data$cwinter) |>
+        summarise(
+          across(
+            "estimate", .names = "{.fn}",
+            list(
+              mean = ~mean(.x, na.rm = TRUE) |>
+                round(4),
+              sd = ~sd(.x, na.rm = TRUE) |>
+                round(4)
+            )
+          )
+        )
+    ) |>
+    write_vc(
+      file = "model_check/cwinter", root = root, append = TRUE,
+      sorting = c("model_type", "species", "cwinter", "analysis")
+    )
+  ps_cwinter |>
+    distinct(.data$cwinter) |>
+    mutate(
+      winter_p1 = (.data$cwinter - median(.data$cwinter)) / 10,
+      winter_p2 = .data$winter_p1 ^ 2
+    ) -> q_winter
+
+  # extract the location specific effects
+  post_sample |>
+    filter(str_detect(.data$parameter, "^matern_spde:")) |>
+    mutate(
+      parameter = str_remove(.data$parameter, "matern_spde:") |>
+        as.integer()
+    ) |>
+    pivot_wider(names_from = "sim", values_from = "estimate") |>
+    arrange(.data$parameter) |>
+    select(-"parameter") |>
+    as.matrix() -> ps_matern
+  x@Model$.args$data[c("location", "X", "Y")] |>
+    as.data.frame() |>
+    distinct() |>
+    filter(!is.na(.data$X)) -> loc_coordinates
+  projector <- inla.mesh.projector(
+    mesh = spde2mesh(x@Spde), loc = as.matrix(loc_coordinates[, c("X", "Y")])
+  )
+  post_sample |>
+    filter(str_detect(.data$parameter, "^location:")) |>
+    transmute(
+      location = str_remove(.data$parameter, "location:") |>
+        as.integer(),
+      .data$sim, q0 = .data$estimate
+    ) |>
+    inner_join(
+      post_sample |>
+        filter(str_detect(.data$parameter, "^location2:")) |>
+        transmute(
+          location = str_remove(.data$parameter, "location2:") |>
+            as.integer(),
+          .data$sim, q1 = .data$estimate
+        ),
+      by = c("location", "sim")
+    ) |>
+    inner_join(
+      post_sample |>
+        filter(str_detect(.data$parameter, "^location3:")) |>
+        transmute(
+          location = str_remove(.data$parameter, "location3:") |>
+            as.integer(),
+          .data$sim, q2 = .data$estimate
+        ),
+      by = c("location", "sim")
+    ) |>
+    mutate(
+      location_id = levels(x@Model$.args$data$location)[.data$location] |>
+        as.integer()
+    ) |>
+    inner_join(
+      as.matrix(projector$proj$A %*% ps_matern) |>
+        as.data.frame() |>
+        mutate(
+          location_id = loc_coordinates$location,
+          location_id = levels(.data$location_id)[.data$location_id] |>
+            as.integer()
+        ) |>
+        pivot_longer(starts_with("sim"), names_to = "sim", values_to = "mesh"),
+      by = c("location_id", "sim")
+    ) -> ps_location
+  x@AnalysisMetadata |>
+    select(
+      species = "species_group_id", "model_type",
+      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+    ) |>
+    bind_cols(
+      ps_location |>
+        group_by(.data$location_id) |>
+        summarise(
+          across(
+            c("q0", "q1", "q2", "mesh"),
+            list(
+              mean = ~mean(.x, na.rm = TRUE) |>
+                round(4),
+              sd = ~sd(.x, na.rm = TRUE) |>
+                round(4)
+            )
+          )
+        )
+  ) |>
+  write_vc(
+    file = "model_check/location_effect", root = root, append = TRUE,
+    sorting = c("model_type", "species", "location_id", "analysis")
+  )
+
+  # predictions at the location level
+  ps_location |>
+    mutate(cwinter = list(q_winter)) |>
+    unnest("cwinter") |>
+    inner_join(ps_cwinter, by = c("cwinter", "sim")) |>
+    transmute(
+      .data$location_id, .data$cwinter, .data$sim,
+      relative = .data$q0 + .data$q1 * .data$winter_p1 +
+        .data$q2 * .data$winter_p2 + .data$mesh,
+      absolute = .data$estimate + .data$relative
+    ) -> ps_location
+  x@AnalysisMetadata |>
+    select(
+      species = "species_group_id", "model_type",
+      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+    ) |>
+    bind_cols(
+      ps_location |>
+        group_by(.data$location_id, .data$cwinter) |>
+        summarise(
+          across(
+            c("relative", "absolute"),
+            list(
+              mean = ~mean(.x, na.rm = TRUE) |>
+                round(4),
+              sd = ~sd(.x, na.rm = TRUE) |>
+                round(4)
+            )
+          ),
+          .groups = "drop"
+        )
+    ) |>
+    write_vc(
+      file = "model_check/location", root = root, append = TRUE,
+      sorting = c("model_type", "species", "location_id", "cwinter", "analysis")
+    )
+
+  # sublocation effect
+  post_sample |>
+    filter(str_detect(.data$parameter, "^sublocation:")) |>
+    transmute(
+      sublocation = str_remove(.data$parameter, "sublocation:") |>
+        as.integer(),
+      .data$sim, q0 = .data$estimate
+    ) |>
+    inner_join(
+      post_sample |>
+        filter(str_detect(.data$parameter, "^sublocation2:")) |>
+        transmute(
+          sublocation = str_remove(.data$parameter, "sublocation2:") |>
+            as.integer(),
+          .data$sim, q1 = .data$estimate
+        ),
+      by = c("sublocation", "sim")
+    ) |>
+    left_join(
+      post_sample |>
+        filter(str_detect(.data$parameter, "^sublocation3:")) |>
+        transmute(
+          sublocation = str_remove(.data$parameter, "sublocation3:") |>
+            as.integer(),
+          .data$sim, q2 = .data$estimate
+        ),
+      by = c("sublocation", "sim")
+    ) |>
+    mutate(q2 = replace_na(.data$q2, 0)) -> ps_sublocation
+  x@AnalysisMetadata |>
+    select(
+      species = "species_group_id", "model_type",
+      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+    ) |>
+    bind_cols(
+      ps_sublocation |>
+        mutate(
+          sublocation_id =
+            levels(x@Model$.args$data$sublocation)[.data$sublocation]
+        ) |>
+        group_by(sublocation_id = as.integer(.data$sublocation_id)) |>
+        summarise(
+          across(
+            c("q0", "q1", "q2"),
+            list(
+              mean = ~mean(.x, na.rm = TRUE) |>
+                round(4),
+              sd = ~sd(.x, na.rm = TRUE) |>
+                round(4)
+            )
+          )
+        )
+    ) |>
+    write_vc(
+      file = "model_check/sublocation_effect", root = root, append = TRUE,
+      sorting = c("model_type", "species", "sublocation_id", "analysis")
+    )
+
+  # predictions at the sublocation level
+  x@AnalysisMetadata |>
+    select(
+      species = "species_group_id", "model_type",
+      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+    ) |>
+    bind_cols(
+      ps_sublocation |>
+        mutate(
+          sublocation_id =
+            levels(x@Model$.args$data$sublocation)[.data$sublocation] |>
+            as.integer(),
+          cwinter = list(q_winter)
+        ) |>
+        unnest("cwinter") |>
+        inner_join(
+          read_vc("hibernation/locations", root = root) |>
+            select(sublocation_id = "id", location_id = "parent_id"),
+           by = "sublocation_id"
+        ) |>
+        inner_join(
+          ps_location |>
+            select("location_id", "cwinter", "sim", "absolute"),
+          by = c("location_id", "cwinter", "sim")
+        ) |>
+        transmute(
+          .data$sublocation_id, .data$sim, .data$cwinter,
+          relative = .data$q0 + .data$q1 * .data$winter_p1 +
+            .data$q2 * .data$winter_p2,
+          absolute = .data$absolute + .data$relative
+        ) |>
+        group_by(.data$sublocation_id, .data$cwinter) |>
+        summarise(
+          across(
+            c("relative", "absolute"),
+            list(
+              mean = ~mean(.x, na.rm = TRUE) |>
+                round(4),
+              sd = ~sd(.x, na.rm = TRUE) |>
+                round(4)
+            )
+          ),
+          .groups = "drop"
+        )
+    ) |>
+    write_vc(
+      file = "model_check/sublocation", root = root, append = TRUE,
+      sorting = c(
+        "model_type", "species", "sublocation_id", "cwinter", "analysis"
+      )
+    )
+  rm(
+    loc_coordinates, post_sample, projector, ps_cwinter, ps_intercept,
+    ps_location, ps_matern, ps_sublocation, q_winter, x
+  )
+  gc(verbose = FALSE)
+  return(invisible(NULL))
+}
+
+#' @export
+#' @importFrom assertthat assert_that
+#' @importFrom dplyr bind_cols group_by inner_join mutate select starts_with
+#' summarise
+#' @importFrom git2rdata is_git2rdata write_vc
+#' @importFrom n2kanalysis get_file_fingerprint
+#' @importFrom stats quantile sd
+extract_results.n2kHurdleImputed <- function(x, root, ...) {
+  assert_that(inherits(x, "n2kHurdleImputed"))
+  message(get_file_fingerprint(x))
+  # skip if model is already in the database
+  if (is_git2rdata("hibernation/hurdle", root = root)) {
+    if (
+      get_file_fingerprint(x) %in%
+      read_vc("hibernation/hurdle", root = root)$analysis
+    ) {
+      return(invisible(NULL))
+    }
+  }
+  x@AnalysisMetadata |>
+    select(
+      species = "species_group_id", "model_type", analysis = "file_fingerprint",
+      fingerprint = "status_fingerprint"
+    ) |>
+    bind_cols(
+      x@Hurdle@Covariate |>
+        transmute(
+          sublocation_id =
+            levels(.data$count_sublocation)[.data$count_sublocation] |>
+              as.integer(),
+          winter = .data$count_winter
+        ) |>
+        bind_cols(x@Hurdle@Imputation) |>
+        pivot_longer(
+          starts_with("Imputation"), names_to = "imputation",
+          values_to = "number"
+        ) |>
+        group_by(.data$sublocation_id, .data$winter) |>
+        summarise(
+          across(
+            "number", .names = "{.fn}",
+            list(
+              mean = ~mean(.x, na.rm = TRUE),
+              sd = ~sd(.x, na.rm = TRUE),
+              p05 = ~quantile(.x, 0.05, na.rm = TRUE),
+              p95 = ~quantile(.x, 0.95, na.rm = TRUE)
+            )
+          ),
+          .groups = "drop"
+        ) |>
+        mutate(delta = .data$p95 - .data$p05)
+    ) |>
+    write_vc(
+      file = "hibernation/hurdle", root = root, optimize = FALSE,
+      append = TRUE,
+      sorting = c(
+        "model_type", "species", "sublocation_id", "winter", "analysis"
+      )
+    )
+  rm(x)
+  gc(verbose = FALSE)
+  return(invisible(NULL))
 }
