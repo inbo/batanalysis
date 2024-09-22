@@ -464,7 +464,7 @@ order random walk on the winter season with a negative binomial distribution.",
 #' @importFrom dplyr arrange bind_cols distinct group_by inner_join mutate
 #' select starts_with summarise
 #' @importFrom git2rdata is_git2rdata update_metadata write_vc
-#' @importFrom INLA inla.mesh.projector inla.posterior.sample
+#' @importFrom INLA inla.mesh.projector inla.posterior.sample inla.zmarginal
 #' @importFrom n2kanalysis get_file_fingerprint spde2mesh
 #' @importFrom purrr map map2_dfc
 #' @importFrom stringr str_detect
@@ -777,6 +777,44 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         "model_type", "species", "sublocation_id", "cwinter", "analysis"
       )
     )
+
+  # hyperparameters
+  x@AnalysisMetadata |>
+    select(
+      species = "species_group_id", "model_type",
+      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+    ) |>
+    bind_cols(
+      names(x@Model$marginals.hyperpar) |>
+        lapply(
+          x = x,
+          function(y, x) {
+            if (!grepl("^Precision for", y)) {
+              inla.zmarginal(x@Model$marginals.hyperpar[[7]], silent = TRUE) |>
+                as.data.frame() |>
+                transmute(
+                  parameter = y, .data$mean,
+                  lcl = .data$quant0.025, ucl = .data$quant0.975
+                ) -> z
+              return(z)
+            }
+            x@Model$marginals.hyperpar[[y]] |>
+              prec2sd() |>
+              transmute(
+                parameter = gsub("Precision", "Stdev", y), .data$mean,
+                lcl = .data$quant0.025, ucl = .data$quant0.975
+              )
+          }
+        ) |>
+        bind_rows()
+    ) |>
+    write_vc(
+      file = "model_check/hyperparameters", root = root, append = TRUE,
+      sorting = c(
+        "model_type", "species", "sublocation_id", "cwinter", "analysis"
+      )
+    )
+
   rm(
     loc_coordinates, post_sample, projector, ps_cwinter, ps_intercept,
     ps_location, ps_matern, ps_sublocation, q_winter, x
