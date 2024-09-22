@@ -827,9 +827,13 @@ extract_results.n2kHurdleImputed <- function(x, root, ...) {
           across(
             "number", .names = "{.fn}",
             list(
-              mean = ~mean(.x, na.rm = TRUE),
-              sd = ~sd(.x, na.rm = TRUE),
+              mean = ~mean(.x, na.rm = TRUE), sd = ~sd(.x, na.rm = TRUE),
               p05 = ~quantile(.x, 0.05, na.rm = TRUE),
+              p20 = ~quantile(.x, 0.20, na.rm = TRUE),
+              p35 = ~quantile(.x, 0.35, na.rm = TRUE),
+              p50 = ~quantile(.x, 0.50, na.rm = TRUE),
+              p65 = ~quantile(.x, 0.65, na.rm = TRUE),
+              p80 = ~quantile(.x, 0.80, na.rm = TRUE),
               p95 = ~quantile(.x, 0.95, na.rm = TRUE)
             )
           ),
