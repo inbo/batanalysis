@@ -343,7 +343,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
     pivot_longer(
       starts_with("Imputation"), names_to = "imputation", values_to = "total"
     ) -> results
-  if (has_name(results, "count_location")) {
+  if (has_name(results, "location")) {
     x@AnalysisMetadata |>
       select(
         species = "species_group_id", "model_type",
@@ -352,7 +352,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
       bind_cols(
         results |>
           group_by(
-            winter = .data$count_winter, location = .data$count_location
+            winter = .data$winter, location = .data$location
           ) |>
           summarise(
             mean = mean(.data$total, na.rm = TRUE),
@@ -408,7 +408,7 @@ order random walk on the winter season with a negative binomial distribution.",
       ) |>
       bind_cols(
         results |>
-          group_by(winter = .data$count_winter) |>
+          group_by(winter = .data$winter) |>
           summarise(
             mean = mean(.data$total, na.rm = TRUE),
             min = min(.data$total, na.rm = TRUE),
@@ -813,9 +813,9 @@ extract_results.n2kHurdleImputed <- function(x, root, ...) {
       x@Hurdle@Covariate |>
         transmute(
           sublocation_id =
-            levels(.data$count_sublocation)[.data$count_sublocation] |>
+            levels(.data$sublocation)[.data$sublocation] |>
               as.integer(),
-          winter = .data$count_winter
+          winter = .data$winter
         ) |>
         bind_cols(x@Hurdle@Imputation) |>
         pivot_longer(
