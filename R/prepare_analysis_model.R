@@ -14,7 +14,7 @@ prepare_analysis_model <- function(
   dirname(analysis_data$path) |>
     file.path("hibernation") |>
     list.dirs(full.names = FALSE) -> species
-  species <- species[species == "mdau"]
+  species <- species[species != ""]
   map_dfr(
     species,
     ~prepare_analysis_model_species(

@@ -108,7 +108,6 @@ present ~ 0 + intercept +
       root = analysis_data,
       variables = c("location_id", "sublocation_id", "winter", "number")
     ) |>
-    filter(.data$number > 0) |>
     left_join(location, by = "location_id") |>
     transmute(
       location = .data$location_id, location2 = .data$location,
