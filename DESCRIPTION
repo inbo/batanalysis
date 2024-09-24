@@ -17,6 +17,7 @@ Imports:
     dplyr,
     git2rdata,
     INLA,
+    inlatools,
     lubridate,
     n2kanalysis,
     purrr,

@@ -462,11 +462,13 @@ order random walk on the winter season with a negative binomial distribution.",
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom dplyr arrange bind_cols distinct group_by inner_join mutate
-#' select starts_with summarise
+#' row_number select starts_with summarise
 #' @importFrom git2rdata is_git2rdata update_metadata write_vc
 #' @importFrom INLA inla.mesh.projector inla.posterior.sample inla.zmarginal
+#' @importFrom inlatools prec2sd
 #' @importFrom n2kanalysis get_file_fingerprint spde2mesh
 #' @importFrom purrr map map2_dfc
+#' @importFrom sf st_area st_as_sf st_convex_hull st_sample st_union
 #' @importFrom stringr str_detect
 #' @importFrom stats quantile
 #' @importFrom tibble rownames_to_column
@@ -810,9 +812,53 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     ) |>
     write_vc(
       file = "model_check/hyperparameters", root = root, append = TRUE,
-      sorting = c(
-        "model_type", "species", "sublocation_id", "cwinter", "analysis"
-      )
+      sorting = c("model_type", "species", "parameter", "analysis")
+    )
+
+  # prediction for the mesh
+  mesh <- spde2mesh(x@Spde)
+  as.data.frame(mesh$loc) |>
+    st_as_sf(coords = c("V1", "V2")) |>
+    st_union() |>
+    st_convex_hull() -> hull
+  hull |>
+    st_sample(type = "hexagonal", size = floor(st_area(hull) / 25)) |>
+    st_coordinates() |>
+    as.data.frame() |>
+    mutate(field_id = row_number()) -> sample_field
+  projector <- inla.mesh.projector(
+    mesh = mesh, loc = as.matrix(sample_field[, c("X", "Y")])
+  )
+  x@AnalysisMetadata |>
+    select(
+      species = "species_group_id", "model_type",
+      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+    ) |>
+    bind_cols(
+      as.matrix(projector$proj$A %*% ps_matern) |>
+        as.data.frame() |>
+        mutate(field_id = sample_field$field_id) |>
+        pivot_longer(
+          starts_with("sim"), names_to = "sim", values_to = "mesh"
+        ) |>
+        group_by(.data$field_id) |>
+        summarise(
+          across(
+            "mesh",
+            list(
+              mean = ~mean(.x, na.rm = TRUE) |>
+                round(4),
+              sd = ~sd(.x, na.rm = TRUE) |>
+                round(4)
+            )
+          ),
+          .groups = "drop"
+        ) |>
+        inner_join(sample_field, by = "field_id")
+    ) |>
+    write_vc(
+      file = "model_check/mesh_prediction", root = root, append = TRUE,
+      sorting = c("model_type", "species", "X", "Y", "analysis")
     )
 
   rm(
