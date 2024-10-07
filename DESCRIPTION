@@ -23,6 +23,7 @@ Imports:
     purrr,
     rlang,
     sf,
+    splines,
     stringr,
     tibble,
     tidyr

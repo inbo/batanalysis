@@ -4,7 +4,8 @@
 #' @inheritParams n2kanalysis::store_model
 #' @export
 #' @importFrom assertthat assert_that
-#' @importFrom n2kanalysis n2k_manifest store_manifest
+#' @importFrom n2kanalysis manifest_yaml_to_bash n2k_manifest
+#' store_manifest_yaml
 #' @importFrom purrr map_dfr
 prepare_analysis_model <- function(
   analysis_data, base, max_dist = 10, project = "batanalysis",
@@ -23,5 +24,13 @@ prepare_analysis_model <- function(
     )
   ) |>
     n2k_manifest() |>
-    store_manifest(base = base, project = project)
+    store_manifest_yaml(
+      base = base, project = project, docker = "inbobmk/rn2k:dev-0.10",
+      dependencies = c(
+        "inbo/multimput@v0.2.14", "inbo/n2khelper@v0.5.0",
+        "inbo/n2kanalysis@spde"
+      )
+    ) |>
+    basename() |>
+    manifest_yaml_to_bash(base = base, project = project, shutdown = TRUE)
 }

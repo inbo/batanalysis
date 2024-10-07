@@ -9,6 +9,7 @@
 #' @importFrom n2kanalysis n2k_aggregate n2k_hurdle_imputed n2k_model_imputed
 #' n2k_spde spde store_model
 #' @importFrom rlang .data
+#' @importFrom splines ns
 prepare_analysis_model_species <- function(
   analysis_data, base, species, max_dist = 10, project = "batanalysis",
   overwrite = FALSE
@@ -40,44 +41,64 @@ prepare_analysis_model_species <- function(
       cwinter = .data$winter + 1 - min(.data$winter),
       observation_id = .data$sample_id
     ) -> dataset
+  dataset |>
+    distinct(.data$cwinter) -> splines
+  n_df <- 3
+  ns(splines$cwinter, df = n_df) |>
+    as.data.frame() |>
+    `colnames<-`(sprintf("knot_%02i", seq_len(n_df))) |>
+    bind_cols(splines) -> splines
 
   # model for presence of the species
   dataset |>
     transmute(
-      location = .data$location_id, location2 = .data$location,
-      location3 = .data$location, sublocation = .data$sublocation_id,
-      sublocation2 = .data$sublocation, .data$winter, .data$cwinter,
+      .data$location_id, .data$sublocation_id,
+      location1 = .data$location_id, sublocation1 = .data$sublocation_id,
+      location2 = .data$location_id, sublocation2 = .data$sublocation_id,
+      location3 = .data$location_id, sublocation3 = .data$sublocation_id,
+      .data$observation_id, .data$winter, .data$cwinter,
       present = as.integer(.data$number > 0), intercept = 1,
-      winter_p1 = (.data$cwinter - median(.data$cwinter)) / 10,
-      winter_p2 = .data$winter_p1 ^ 2, .data$observation_id,
       datafield_id = "analysis_data", .data$X, .data$Y
     ) |>
+    inner_join(splines, by = "cwinter") |>
     as.data.frame() -> data
   presence <- n2k_spde(
     formula = "
 present ~ 0 + intercept +
     f(
-      cwinter, model = \"rw2\",
-      hyper = list(theta = list(prior = \"pc.prec\", param = c(0.2, 0.05)))
+      cwinter, model = \"rw1\",
+      hyper = list(theta = list(prior = \"pc.prec\", param = c(0.15, 0.05)))
     ) +
     f(
-      location, model = \"iid\",
+      location_id, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
     ) +
     f(
-      location2, winter_p1, model = \"iid\",
+      location1, knot_01, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     ) +
     f(
-      location3, winter_p2, model = \"iid\",
+      location2, knot_02, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     ) +
     f(
-      sublocation, model = \"iid\",
+      location3, knot_03, model = \"iid\",
+      hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
+    ) +
+    f(
+      sublocation_id, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
     ) +
     f(
-      sublocation2, winter_p1, model = \"iid\",
+      sublocation1, knot_01, model = \"iid\",
+      hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
+    ) +
+    f(
+      sublocation2, knot_02, model = \"iid\",
+      hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
+    ) +
+    f(
+      sublocation3, knot_03, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     )",
     model_type = "inla binomial: SPDE + Winter * (1 + Location + SubLocation)",
@@ -86,7 +107,7 @@ present ~ 0 + intercept +
     location_group_id = "Flanders", seed = 19911204,
     spde_prior = list(range = c(max_dist, 0.9), sigma = c(1, 0.01)),
     first_imported_year = min(dataset$winter), analysis_date = rc$when,
-    last_imported_year = max(dataset$winter), imputation_size = 100
+    last_imported_year = max(dataset$winter)
   )
   store_model(presence, base = base, project = project, overwrite = overwrite)
 
@@ -94,14 +115,15 @@ present ~ 0 + intercept +
   # species
   dataset |>
     transmute(
-      location = .data$location_id, location2 = .data$location,
-      location3 = .data$location, sublocation = .data$sublocation_id,
-      sublocation2 = .data$sublocation, .data$winter, .data$cwinter,
+      .data$location_id, location1 = .data$location_id,
+      location2 = .data$location_id, location3 = .data$location_id,
+      .data$sublocation_id, sublocation1 = .data$sublocation_id,
+      sublocation2 = .data$sublocation_id, sublocation3 = .data$sublocation_id,
+      .data$observation_id, .data$winter, .data$cwinter,
       number = ifelse(.data$number > 0, .data$number, NA), intercept = 1,
-      winter_p1 = (.data$cwinter - median(.data$cwinter)) / 10,
-      winter_p2 = .data$winter_p1 ^ 2, .data$observation_id,
       datafield_id = "analysis_data", .data$X, .data$Y
     ) |>
+    inner_join(splines, by = "cwinter") |>
     as.data.frame() -> data
   file.path("hibernation", tolower(species), "rare_sublocation") |>
     verify_vc(
@@ -110,14 +132,16 @@ present ~ 0 + intercept +
     ) |>
     left_join(location, by = "location_id") |>
     transmute(
-      location = .data$location_id, location2 = .data$location,
-      location3 = .data$location, sublocation = .data$sublocation_id,
-      sublocation2 = .data$sublocation, .data$number, intercept = 1,
+      .data$location_id, location1 = .data$location_id,
+      location2 = .data$location_id, location3 = .data$location_id,
+      .data$sublocation_id, sublocation1 = .data$sublocation_id,
+      sublocation2 = .data$sublocation_id, sublocation3 = .data$sublocation_id,
+      .data$number, intercept = 1,
       .data$winter, cwinter = .data$winter + 1 - min(dataset$winter),
-      winter_p1 = (.data$cwinter - median(.data$cwinter)) / 10,
-      winter_p2 = .data$winter_p1 ^ 2, observation_id = .data$sample_id,
-      datafield_id = "analysis_data", .data$X, .data$Y
+      observation_id = .data$sample_id, datafield_id = "analysis_data", .data$X,
+      .data$Y
     ) |>
+    inner_join(splines, by = "cwinter") |>
     as.data.frame() -> extra
   count <- n2k_spde(
     formula = "
@@ -127,23 +151,35 @@ number ~ 0 + intercept +
       hyper = list(theta = list(prior = \"pc.prec\", param = c(0.2, 0.05)))
     ) +
     f(
-      location, model = \"iid\",
+      location_id, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
     ) +
     f(
-      location2, winter_p1, model = \"iid\",
+      location1, knot_01, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     ) +
     f(
-      location3, winter_p2, model = \"iid\",
+      location2, knot_02, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     ) +
     f(
-      sublocation, model = \"iid\",
+      location3, knot_03, model = \"iid\",
+      hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
+    ) +
+    f(
+      sublocation_id, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
     ) +
     f(
-      sublocation2, winter_p1, model = \"iid\",
+      sublocation1, knot_01, model = \"iid\",
+      hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
+    ) +
+    f(
+      sublocation2, knot_02, model = \"iid\",
+      hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
+    ) +
+    f(
+      sublocation3, knot_03, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     )",
     model_type =
@@ -156,7 +192,7 @@ number ~ 0 + intercept +
     last_imported_year = max(dataset$winter), imputation_size = 100,
     control = list(
       control.family = list(
-        list(hyper = list(theta2 = list(intial = -10, fixed = TRUE)))
+        list(hyper = list(theta2 = list(initial = -20, fixed = TRUE)))
       )
     )
   )
@@ -298,7 +334,7 @@ number ~ 0 + intercept +
     species_group_id = hurdle@AnalysisMetadata$species_group_id,
     location_group_id = hurdle@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter + location",
-    formula = "~winter + location", fun = sum, status = "waiting",
+    formula = "~winter + location_id", fun = sum, status = "waiting",
     parent = hurdle@AnalysisMetadata$file_fingerprint,
     first_imported_year = hurdle@AnalysisMetadata$first_imported_year,
     last_imported_year = hurdle@AnalysisMetadata$last_imported_year,
@@ -312,7 +348,9 @@ number ~ 0 + intercept +
 
   bind_rows(
     data.frame(
-      analysis = c(get_file_fingerprint(presence), get_file_fingerprint(count))
+      analysis = c(
+        get_file_fingerprint(presence), get_file_fingerprint(count)
+      )
     ),
     hurdle@AnalysisRelation,
     aggregated_tot@AnalysisRelation, total_index@AnalysisRelation,
