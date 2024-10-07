@@ -38,30 +38,39 @@ prepare_analysis_model_species <- function(
     ) |>
     inner_join(location, by = "location_id") |>
     mutate(
+      llocation = .data$location_id, lsublocation = .data$sublocation_id,
+      qlocation = .data$location_id, qsublocation = .data$sublocation_id,
+      observation_id = .data$sample_id, datafield_id = "analysis_data",
       cwinter = .data$winter + 1 - min(.data$winter),
-      observation_id = .data$sample_id
+      lwinter = (.data$cwinter - median(.data$cwinter)) / 10,
+      qwinter = .data$lwinter ^ 2, intercept = 1
     ) -> dataset
-  dataset |>
-    distinct(.data$cwinter) -> splines
-  n_df <- 3
-  ns(splines$cwinter, df = n_df) |>
-    as.data.frame() |>
-    `colnames<-`(sprintf("knot_%02i", seq_len(n_df))) |>
-    bind_cols(splines) -> splines
-
   # model for presence of the species
   dataset |>
-    transmute(
-      .data$location_id, .data$sublocation_id,
-      location1 = .data$location_id, sublocation1 = .data$sublocation_id,
-      location2 = .data$location_id, sublocation2 = .data$sublocation_id,
-      location3 = .data$location_id, sublocation3 = .data$sublocation_id,
-      .data$observation_id, .data$winter, .data$cwinter,
-      present = as.integer(.data$number > 0), intercept = 1,
-      datafield_id = "analysis_data", .data$X, .data$Y
-    ) |>
-    inner_join(splines, by = "cwinter") |>
+    mutate(present = as.integer(.data$number > 0)) |>
+    select(-"number", -'sample_id') |>
     as.data.frame() -> data
+  data |>
+    filter(!is.na(.data$present)) |>
+    count(.data$sublocation_id, name = "n_subloc") |>
+    left_join(x = data, by = "sublocation_id") |>
+    mutate(
+      lsubwinter = ifelse(.data$n_subloc <= 5, 0, .data$lwinter),
+      qsubwinter = ifelse(.data$n_subloc <= 10, 0, .data$qwinter)
+    ) |>
+    select(-"n_subloc") |>
+    left_join(
+      data |>
+        filter(!is.na(.data$present)) |>
+        distinct(.data$location_id, .data$winter) |>
+        count(.data$location_id, name = "n_loc"),
+      by = "location_id"
+    ) |>
+    mutate(
+      lwinter = ifelse(.data$n_loc <= 5, 0, .data$lwinter),
+      qwinter = ifelse(.data$n_loc <= 10, 0, .data$qwinter)
+    ) |>
+    select(-"n_loc") -> data
   presence <- n2k_spde(
     formula = "
 present ~ 0 + intercept +
@@ -74,15 +83,11 @@ present ~ 0 + intercept +
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
     ) +
     f(
-      location1, knot_01, model = \"iid\",
+      llocation, lwinter, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     ) +
     f(
-      location2, knot_02, model = \"iid\",
-      hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-    ) +
-    f(
-      location3, knot_03, model = \"iid\",
+      qlocation, qwinter, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     ) +
     f(
@@ -90,15 +95,11 @@ present ~ 0 + intercept +
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
     ) +
     f(
-      sublocation1, knot_01, model = \"iid\",
+      lsublocation, lsubwinter, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     ) +
     f(
-      sublocation2, knot_02, model = \"iid\",
-      hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-    ) +
-    f(
-      sublocation3, knot_03, model = \"iid\",
+      qsublocation, qsubwinter, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     )",
     model_type = "inla binomial: SPDE + Winter * (1 + Location + SubLocation)",
@@ -107,24 +108,37 @@ present ~ 0 + intercept +
     location_group_id = "Flanders", seed = 19911204,
     spde_prior = list(range = c(max_dist, 0.9), sigma = c(1, 0.01)),
     first_imported_year = min(dataset$winter), analysis_date = rc$when,
-    last_imported_year = max(dataset$winter)
+    last_imported_year = max(dataset$winter), imputation_size = 100
   )
   store_model(presence, base = base, project = project, overwrite = overwrite)
 
   # model for the number of individuals conditional on the presence of the
   # species
   dataset |>
-    transmute(
-      .data$location_id, location1 = .data$location_id,
-      location2 = .data$location_id, location3 = .data$location_id,
-      .data$sublocation_id, sublocation1 = .data$sublocation_id,
-      sublocation2 = .data$sublocation_id, sublocation3 = .data$sublocation_id,
-      .data$observation_id, .data$winter, .data$cwinter,
-      number = ifelse(.data$number > 0, .data$number, NA), intercept = 1,
-      datafield_id = "analysis_data", .data$X, .data$Y
-    ) |>
-    inner_join(splines, by = "cwinter") |>
+    mutate(number = ifelse(.data$number > 0, .data$number, NA_integer_)) |>
+    select(-"sample_id") |>
     as.data.frame() -> data
+  data |>
+    filter(!is.na(.data$number)) |>
+    count(.data$sublocation_id, name = "n_subloc") |>
+    left_join(x = data, by = "sublocation_id") |>
+    mutate(
+      lsubwinter = ifelse(.data$n_subloc <= 5, 0, .data$lwinter),
+      qsubwinter = ifelse(.data$n_subloc <= 10, 0, .data$qwinter)
+    ) |>
+    select(-"n_subloc") |>
+    left_join(
+      data |>
+        filter(!is.na(.data$number)) |>
+        distinct(.data$location_id, .data$winter) |>
+        count(.data$location_id, name = "n_loc"),
+      by = "location_id"
+    ) |>
+    mutate(
+      lwinter = ifelse(.data$n_loc <= 5, 0, .data$lwinter),
+      qwinter = ifelse(.data$n_loc <= 10, 0, .data$qwinter)
+    ) |>
+    select(-"n_loc") -> data
   file.path("hibernation", tolower(species), "rare_sublocation") |>
     verify_vc(
       root = analysis_data,
@@ -132,16 +146,15 @@ present ~ 0 + intercept +
     ) |>
     left_join(location, by = "location_id") |>
     transmute(
-      .data$location_id, location1 = .data$location_id,
-      location2 = .data$location_id, location3 = .data$location_id,
-      .data$sublocation_id, sublocation1 = .data$sublocation_id,
-      sublocation2 = .data$sublocation_id, sublocation3 = .data$sublocation_id,
-      .data$number, intercept = 1,
+      .data$location_id, .data$sublocation_id,
+      llocation = .data$location_id, lsublocation = .data$sublocation_id,
+      qlocation = .data$location_id, qsublocation = .data$sublocation_id,
+      .data$number, intercept = 1, .data$X, .data$Y,
       .data$winter, cwinter = .data$winter + 1 - min(dataset$winter),
-      observation_id = .data$sample_id, datafield_id = "analysis_data", .data$X,
-      .data$Y
+      lwinter = (.data$cwinter - median(.data$cwinter)) / 10,
+      qwinter = .data$lwinter ^ 2, lsubwinter = 0, qsubwinter = 0,
+      observation_id = .data$sample_id, datafield_id = "analysis_data"
     ) |>
-    inner_join(splines, by = "cwinter") |>
     as.data.frame() -> extra
   count <- n2k_spde(
     formula = "
@@ -155,15 +168,11 @@ number ~ 0 + intercept +
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
     ) +
     f(
-      location1, knot_01, model = \"iid\",
+      llocation, lwinter, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     ) +
     f(
-      location2, knot_02, model = \"iid\",
-      hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-    ) +
-    f(
-      location3, knot_03, model = \"iid\",
+      qlocation, qwinter, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     ) +
     f(
@@ -171,15 +180,11 @@ number ~ 0 + intercept +
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
     ) +
     f(
-      sublocation1, knot_01, model = \"iid\",
+      lsublocation, lsubwinter, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     ) +
     f(
-      sublocation2, knot_02, model = \"iid\",
-      hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-    ) +
-    f(
-      sublocation3, knot_03, model = \"iid\",
+      qsublocation, qsubwinter, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     )",
     model_type =
