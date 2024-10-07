@@ -10,11 +10,13 @@
 #' @importFrom git2rdata read_vc
 #' @importFrom lubridate round_date year
 select_imputation_total <- function(
-  target, species = "Mmysbra", start = Sys.Date() - 12 * 365
+  target, species = "Mmysbra", start = Sys.Date() - 12 * 365,
+  n_present = 3, n_extrapolation = 5
 ) {
   assert_that(
     inherits(target, "git_repository"), is.string(species), noNA(species),
-    is.date(start), noNA(start)
+    is.date(start), noNA(start), is.count(n_extrapolation),
+    noNA(n_extrapolation), is.count(n_present), noNA(n_present)
   )
   relevant_species <- get_child_species(target = target, species = species)
   read_vc("hibernation/visits", root = target) |>
@@ -24,7 +26,8 @@ select_imputation_total <- function(
       delta = abs(
         as.POSIXct(.data$winter) + (14 * 24 + 9) * 3600 - as.POSIXct(.data$date)
       ),
-      winter = year(.data$winter)
+      winter = year(.data$winter) |>
+        as.integer()
     ) |>
     slice_min(.data$delta, n = 1, by = c("location_id", "winter")) |>
     select(-"delta", -"date") |>
@@ -37,7 +40,7 @@ select_imputation_total <- function(
     ) |>
     mutate(
       total = ifelse(
-        .data$species_id %in% relevant_species$id, .data$total, 0
+        .data$species_id %in% relevant_species$id, .data$total, 0L
       )
     ) |>
     group_by(.data$location_id, .data$winter) |>
@@ -55,9 +58,29 @@ select_imputation_total <- function(
       .data$location_id, .data$winter,
       minimum = ifelse(!is.na(.data$n), .data$total, NA),
       total = ifelse(is.na(.data$n), .data$total, NA)
+    ) -> observations
+  # remove locations with less than n_present observed winters
+  observations |>
+    filter(.data$minimum > 0 | .data$total > 0) |>
+    count(.data$location_id) |>
+    filter(.data$n >= n_present) |>
+    semi_join(x = observations, by = "location_id") -> observations
+  # remove location winter combinations with to much extrapolation
+  observations |>
+    filter(is.na(.data$total), is.na(.data$minimum)) |>
+    select("winter", "location_id") |>
+    inner_join(
+      observations |>
+        filter(.data$total > 0 | .data$minimum > 0) |>
+        select(observed = "winter", "location_id"),
+      by = "location_id", relationship = "many-to-many"
     ) |>
-    left_join(
-      read_vc("hibernation/cluster_location", root = target),
-      by = c("location_id" = "id")
+    mutate(delta = abs(.data$winter - .data$observed)) |>
+    filter(.data$delta <= n_extrapolation) |>
+    distinct(.data$winter, .data$location_id) |>
+    semi_join(x = observations, by = c("winter", "location_id")) |>
+    bind_rows(
+      observations |>
+        filter(!is.na(.data$total) | !is.na(.data$minimum))
     )
 }

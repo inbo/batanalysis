@@ -11,6 +11,7 @@ prepare_analysis_data_species(
   start,
   n_winter = 4,
   n_present = 3,
+  n_extrapolation = 5,
   strict = TRUE
 )
 }
@@ -23,9 +24,14 @@ prepare_analysis_data_species(
 
 \item{start}{The oldest date to use in the analysis}
 
-\item{n_winter}{Minimum number of winters in which the species is observed at
+\item{n_present}{Minimum number of winters in which the species is observed at
 a location.
 Remove locations with a number below this threshold.}
+
+\item{n_extrapolation}{Maximum number of winters to extrapolate the data.
+Only do imputations when the difference between the nearest observed winter
+and the missing winter is below or equal to this threshold.
+Is applied at the most detailed spatial level.}
 
 \item{strict}{What to do when the metadata changes. \code{strict = FALSE}
 overwrites the data and the metadata with a warning listing the changes,

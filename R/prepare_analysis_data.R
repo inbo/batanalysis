@@ -13,7 +13,7 @@
 #' @importFrom tidyr complete nesting
 prepare_analysis_data_species <- function(
   raw_data, analysis_data, species, start, n_winter = 4, n_present = 3,
-  strict = TRUE
+  n_extrapolation = 5, strict = TRUE
 ) {
   assert_that(
     is.number(start), is.count(n_winter), is.count(n_present), noNA(start),
@@ -30,21 +30,20 @@ prepare_analysis_data_species <- function(
   stopifnot("No matching species found" = nrow(this_species) > 0)
   message("Preparing the data for ", this_species$scientific_name[1])
   sections <- select_imputation_section(
-    target = raw_data, species = species, start = as.Date(start), n_winter = 1
+    target = raw_data, species = species, start = as.Date(start),
+    n_present = 1, n_extrapolation = n_extrapolation
   )
   read_vc("hibernation/locations", root = raw_data) |>
     select(location_id = "id", "longitude", "latitude") |>
     st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
     st_transform(crs = 31370) -> locations
   select_imputation_total(
-    target = raw_data, species = species, start = as.Date(start)
+    target = raw_data, species = species, start = as.Date(start),
+    n_present = 1, n_extrapolation = n_extrapolation
   ) |>
-    filter(!is.na(.data$total)) |>
     select(-"minimum", number = "total") |>
     mutate(sublocation_id = .data$location_id) |>
     bind_rows(sections) |>
-    select(-"cluster") |>
-    complete(.data$winter, nesting(location_id, sublocation_id)) |> # nolint: object_usage_linter
     inner_join(
       locations |>
         bind_cols(st_coordinates(locations) / 1000) |>
@@ -53,8 +52,7 @@ prepare_analysis_data_species <- function(
     ) |>
     group_by(.data$sublocation_id) |>
     mutate(
-      relevant = sum(.data$number > 0, na.rm = TRUE),
-      across(c("winter", "number"), ~as.integer(.x))
+      relevant = sum(.data$number > 0, na.rm = TRUE)
     ) |>
     ungroup() -> dataset
 

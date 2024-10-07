@@ -7,7 +7,9 @@
 select_imputation_total(
   target,
   species = "Mmysbra",
-  start = Sys.Date() - 12 * 365
+  start = Sys.Date() - 12 * 365,
+  n_present = 3,
+  n_extrapolation = 5
 )
 }
 \arguments{
@@ -16,6 +18,15 @@ select_imputation_total(
 \item{species}{the ID of the species}
 
 \item{start}{The oldest date to use in the analysis}
+
+\item{n_present}{Minimum number of winters in which the species is observed at
+a location.
+Remove locations with a number below this threshold.}
+
+\item{n_extrapolation}{Maximum number of winters to extrapolate the data.
+Only do imputations when the difference between the nearest observed winter
+and the missing winter is below or equal to this threshold.
+Is applied at the most detailed spatial level.}
 }
 \description{
 Use only the data collected using the totals based protocol.
