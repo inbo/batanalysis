@@ -22,7 +22,9 @@ library(DT)
 library(git2rdata)
 library(INBOtheme)
 library(knitr)
+library(leaflet)
 library(scales)
+library(sf)
 library(tidyverse)
 target <- repository(params$target)
 conflicted::conflicts_prefer(dplyr::filter)
@@ -256,7 +258,7 @@ survey_effort |>
 ### Currently not-usable locations
 
 ```{r tbl-missing-detail-24}
-#| tbl-cap: Locations with to few detailed surveys during the last 24 years
+#| tbl-cap: Locations with too few detailed surveys during the last 24 years
 #|   and additional totals during the last 24 years.
 survey_effort |>
   filter(.data$surveyed_last_24 < params$n_surveyed) |>
@@ -278,7 +280,7 @@ survey_effort |>
 ```
 
 ```{r tbl-missing-other-24}
-#| tbl-cap: Locations with to few detailed surveys during the last 24 years
+#| tbl-cap: Locations with too few detailed surveys during the last 24 years
 #|   and no additional totals.
 survey_effort |>
   filter(.data$surveyed_last_24 < params$n_surveyed) |>
@@ -361,7 +363,7 @@ survey_effort |>
 ### Currently not usable locations
 
 ```{r tbl-missing-detail-12}
-#| tbl-cap: Locations with to few detailed surveys during the last 12 years
+#| tbl-cap: Locations with too few detailed surveys during the last 12 years
 #|   and additional totals during the last 12 years.
 survey_effort |>
   filter(.data$surveyed_last_12 < params$n_surveyed) |>
@@ -383,7 +385,7 @@ survey_effort |>
 ```
 
 ```{r tbl-missing-other-12}
-#| tbl-cap: Locations with to few detailed surveys during the last 12 years
+#| tbl-cap: Locations with too few detailed surveys during the last 12 years
 #|   and no additional totals.
 survey_effort |>
   filter(.data$surveyed_last_12 < params$n_surveyed) |>
@@ -402,7 +404,8 @@ survey_effort |>
   datatable(rownames = FALSE)
 ```
 
-```{r}
+```{r leaflet}
+#| fig.cap: "Map with usable locations during the last 12 years."
 section_total |>
   filter(max(.data$winter) - .data$winter <= 11) |>
   count(.data$location_id, .data$type) |>
@@ -410,8 +413,9 @@ section_total |>
     id_cols = "location_id", names_from = .data$type, values_from = .data$n
   ) |>
   mutate(
-    useable = as.integer(
-      !is.na(.data$detailed) & .data$detailed >= params$n_observed
+    useable = factor(
+      !is.na(.data$detailed) & .data$detailed >= params$n_observed,
+      levels = c(FALSE, TRUE), labels = c("not usable", "usable")
     )
   ) |>
   inner_join(locations, by = c("location_id" = "id")) |>
@@ -420,12 +424,21 @@ pal_detailed <- colorNumeric(
   palette = c(inbo_felrood, inbo_steun_blauw),
   domain = c(0, 12)
 )
-pal_use <- colorBin(
-  palette = c(inbo_geel, inbo_hoofd),
-  domain = c(0, 1)
+pal_use <- colorFactor(
+  palette = c(inbo_geel, inbo_hoofd), levels = c("not usable", "usable")
 )
 leaflet(effort_12) |>
   addTiles() |>
-  addCircleMarkers(color = ~pal_use(useable), fillColor = ~pal_detailed(detailed))
+  addCircleMarkers(
+    color = ~pal_use(useable), fillColor = ~pal_detailed(detailed)
+  ) |>
+  addLegend(
+    position = "bottomright", pal = pal_detailed, values = ~detailed,
+    title = "number of\ndetailed surveys"
+  ) |>
+  addLegend(
+    position = "bottomright", pal = pal_use, values = ~useable,
+    title = "usable locations"
+  )
 ```
 
