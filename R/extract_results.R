@@ -13,16 +13,15 @@ extract_results.default <- function(x, ...) {
 }
 
 #' @export
-#' @importFrom assertthat assert_that is.string noNA
+#' @importFrom assertthat assert_that is.flag is.string noNA
 #' @importFrom dplyr anti_join distinct
 #' @importFrom git2rdata verify_vc write_vc
-#' @importFrom n2kanalysis read_manifest read_model
+#' @importFrom n2kanalysis order_manifest read_manifest read_model
 #' @importFrom purrr walk
-#'
 extract_results.character <- function(
-  x, base, project = "batanalysis", raw_data, root, ...
+  x, base, project = "batanalysis", raw_data, root, random = FALSE, ...
 ) {
-  assert_that(is.string(x), noNA(x))
+  assert_that(is.string(x), noNA(x), is.flag(random), noNA(random))
   verify_vc(
     "hibernation/species", root = raw_data,
     variables = c("id", "code", "name", "scientific_name", "parent")
@@ -38,41 +37,41 @@ extract_results.character <- function(
       "hibernation/locations", root = root, sorting = "id", optimize = FALSE
     )
   read_manifest(base = base, project = project, hash = x) |>
-    slot("Manifest") |>
-    distinct(.data$fingerprint) -> manifest
+    order_manifest() |>
+    rev() -> manifest
+  if (random) {
+    manifest <- sample(manifest)
+  }
   if (is_git2rdata("model_check/sublocation", root = root)) {
-    manifest |>
-      anti_join(
-        verify_vc("model_check/sublocation", root = root, "analysis"),
-        by = c("fingerprint" = "analysis")
-      ) -> manifest
+    manifest <- manifest[
+      !manifest %in%
+        verify_vc("model_check/sublocation", root = root, "analysis")$analysis
+    ]
   }
   if (is_git2rdata("hibernation/hurdle", root = root)) {
-    manifest |>
-      anti_join(
-        verify_vc("hibernation/hurdle", root = root, "analysis"),
-        by = c("fingerprint" = "analysis")
-      ) -> manifest
+    manifest <- manifest[
+      !manifest %in%
+        verify_vc("hibernation/hurdle", root = root, "analysis")$analysis
+    ]
   }
   if (is_git2rdata("hibernation/total", root = root)) {
-    manifest |>
-      anti_join(
-        verify_vc("hibernation/total", root = root, "analysis"),
-        by = c("fingerprint" = "analysis")
-      ) -> manifest
+    manifest <- manifest[
+      !manifest %in%
+        verify_vc("hibernation/total", root = root, "analysis")$analysis
+    ]
   }
   if (is_git2rdata("hibernation/difference", root = root)) {
-    manifest |>
-      anti_join(
-        verify_vc("hibernation/difference", root = root, "analysis"),
-        by = c("fingerprint" = "analysis")
-      ) -> manifest
+    manifest <- manifest[
+      !manifest %in%
+        verify_vc("hibernation/difference", root = root, "analysis")$analysis
+    ]
   }
-  walk(
-    manifest$fingerprint,
-    ~read_model(.x, base = base, project = project) |>
-         extract_results(root = root)
-  )
+  for (i in manifest) {
+    message(i)
+    read_model(i, base = base, project = project) |>
+      extract_results(root = root)
+    gc(verbose = FALSE)
+  }
   return(invisible(NULL))
 }
 
@@ -85,7 +84,6 @@ extract_results.character <- function(
 #' @importFrom tidyr separate_wider_regex
 extract_results.n2kModelImputed <- function(x, root, ...) {
   assert_that(inherits(x, "n2kModelImputed"))
-  message(get_file_fingerprint(x))
   # skip if model is already in the database
   if (is_git2rdata("hibernation/difference", root = root)) {
     if (
@@ -328,7 +326,6 @@ period",
 #' @importFrom tidyr pivot_longer
 extract_results.n2kAggregate <- function(x, root, ...) {
   assert_that(inherits(x, "n2kAggregate"))
-  message(get_file_fingerprint(x))
   # skip if model is already in the database
   if (is_git2rdata("hibernation/total", root = root)) {
     if (
@@ -343,7 +340,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
     pivot_longer(
       starts_with("Imputation"), names_to = "imputation", values_to = "total"
     ) -> results
-  if (has_name(results, "location")) {
+  if (has_name(results, "location_id")) {
     x@AnalysisMetadata |>
       select(
         species = "species_group_id", "model_type",
@@ -352,7 +349,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
       bind_cols(
         results |>
           group_by(
-            winter = .data$winter, location = .data$location
+            winter = .data$winter, location = .data$location_id
           ) |>
           summarise(
             mean = mean(.data$total, na.rm = TRUE),
@@ -475,7 +472,6 @@ order random walk on the winter season with a negative binomial distribution.",
 #' @importFrom tidyr everything pivot_longer pivot_wider
 extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
   assert_that(inherits(x, "n2kSpde"), is.count(n_sim), noNA(n_sim))
-  message(get_file_fingerprint(x))
   # skip if model is not converged
   if (n2kanalysis::status(x) != "converged") {
     return(invisible(NULL))
@@ -544,8 +540,8 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
   ps_cwinter |>
     distinct(.data$cwinter) |>
     mutate(
-      winter_p1 = (.data$cwinter - median(.data$cwinter)) / 10,
-      winter_p2 = .data$winter_p1 ^ 2
+      lwinter = (.data$cwinter - median(.data$cwinter)) / 10,
+      qwinter = .data$lwinter ^ 2
     ) -> q_winter
 
   # extract the location specific effects
@@ -559,7 +555,7 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     arrange(.data$parameter) |>
     select(-"parameter") |>
     as.matrix() -> ps_matern
-  x@Model$.args$data[c("location", "X", "Y")] |>
+  x@Model$.args$data[c("location_id", "X", "Y")] |>
     as.data.frame() |>
     distinct() |>
     filter(!is.na(.data$X)) -> loc_coordinates
@@ -567,41 +563,41 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     mesh = spde2mesh(x@Spde), loc = as.matrix(loc_coordinates[, c("X", "Y")])
   )
   post_sample |>
-    filter(str_detect(.data$parameter, "^location:")) |>
+    filter(str_detect(.data$parameter, "^location_id:")) |>
     transmute(
-      location = str_remove(.data$parameter, "location:") |>
+      location_id = str_remove(.data$parameter, "location_id:") |>
         as.integer(),
       .data$sim, q0 = .data$estimate
     ) |>
     inner_join(
       post_sample |>
-        filter(str_detect(.data$parameter, "^location2:")) |>
+        filter(str_detect(.data$parameter, "^llocation:")) |>
         transmute(
-          location = str_remove(.data$parameter, "location2:") |>
+          location_id = str_remove(.data$parameter, "llocation:") |>
             as.integer(),
           .data$sim, q1 = .data$estimate
         ),
-      by = c("location", "sim")
+      by = c("location_id", "sim")
     ) |>
     inner_join(
       post_sample |>
-        filter(str_detect(.data$parameter, "^location3:")) |>
+        filter(str_detect(.data$parameter, "^qlocation:")) |>
         transmute(
-          location = str_remove(.data$parameter, "location3:") |>
+          location_id = str_remove(.data$parameter, "qlocation:") |>
             as.integer(),
           .data$sim, q2 = .data$estimate
         ),
-      by = c("location", "sim")
+      by = c("location_id", "sim")
     ) |>
     mutate(
-      location_id = levels(x@Model$.args$data$location)[.data$location] |>
+      location_id = levels(x@Model$.args$data$location_id)[.data$location_id] |>
         as.integer()
     ) |>
     inner_join(
       as.matrix(projector$proj$A %*% ps_matern) |>
         as.data.frame() |>
         mutate(
-          location_id = loc_coordinates$location,
+          location_id = loc_coordinates$location_id,
           location_id = levels(.data$location_id)[.data$location_id] |>
             as.integer()
         ) |>
@@ -640,8 +636,8 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     inner_join(ps_cwinter, by = c("cwinter", "sim")) |>
     transmute(
       .data$location_id, .data$cwinter, .data$sim,
-      relative = .data$q0 + .data$q1 * .data$winter_p1 +
-        .data$q2 * .data$winter_p2 + .data$mesh,
+      relative = .data$q0 + .data$q1 * .data$lwinter +
+        .data$q2 * .data$qwinter + .data$mesh,
       absolute = .data$estimate + .data$relative
     ) -> ps_location
   x@AnalysisMetadata |>
@@ -672,31 +668,31 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
 
   # sublocation effect
   post_sample |>
-    filter(str_detect(.data$parameter, "^sublocation:")) |>
+    filter(str_detect(.data$parameter, "^sublocation_id:")) |>
     transmute(
-      sublocation = str_remove(.data$parameter, "sublocation:") |>
+      sublocation_id = str_remove(.data$parameter, "sublocation_id:") |>
         as.integer(),
       .data$sim, q0 = .data$estimate
     ) |>
     inner_join(
       post_sample |>
-        filter(str_detect(.data$parameter, "^sublocation2:")) |>
+        filter(str_detect(.data$parameter, "^lsublocation:")) |>
         transmute(
-          sublocation = str_remove(.data$parameter, "sublocation2:") |>
+          sublocation_id = str_remove(.data$parameter, "lsublocation:") |>
             as.integer(),
           .data$sim, q1 = .data$estimate
         ),
-      by = c("sublocation", "sim")
+      by = c("sublocation_id", "sim")
     ) |>
     left_join(
       post_sample |>
-        filter(str_detect(.data$parameter, "^sublocation3:")) |>
+        filter(str_detect(.data$parameter, "^qsublocation:")) |>
         transmute(
-          sublocation = str_remove(.data$parameter, "sublocation3:") |>
+          sublocation_id = str_remove(.data$parameter, "qsublocation:") |>
             as.integer(),
           .data$sim, q2 = .data$estimate
         ),
-      by = c("sublocation", "sim")
+      by = c("sublocation_id", "sim")
     ) |>
     mutate(q2 = replace_na(.data$q2, 0)) -> ps_sublocation
   x@AnalysisMetadata |>
@@ -708,7 +704,7 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
       ps_sublocation |>
         mutate(
           sublocation_id =
-            levels(x@Model$.args$data$sublocation)[.data$sublocation]
+            levels(x@Model$.args$data$sublocation)[.data$sublocation_id]
         ) |>
         group_by(sublocation_id = as.integer(.data$sublocation_id)) |>
         summarise(
@@ -738,7 +734,7 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
       ps_sublocation |>
         mutate(
           sublocation_id =
-            levels(x@Model$.args$data$sublocation)[.data$sublocation] |>
+            levels(x@Model$.args$data$sublocation)[.data$sublocation_id] |>
             as.integer(),
           cwinter = list(q_winter)
         ) |>
@@ -755,8 +751,8 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         ) |>
         transmute(
           .data$sublocation_id, .data$sim, .data$cwinter,
-          relative = .data$q0 + .data$q1 * .data$winter_p1 +
-            .data$q2 * .data$winter_p2,
+          relative = .data$q0 + .data$q1 * .data$lwinter +
+            .data$q2 * .data$qwinter,
           absolute = .data$absolute + .data$relative
         ) |>
         group_by(.data$sublocation_id, .data$cwinter) |>
@@ -878,7 +874,6 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
 #' @importFrom stats quantile sd
 extract_results.n2kHurdleImputed <- function(x, root, ...) {
   assert_that(inherits(x, "n2kHurdleImputed"))
-  message(get_file_fingerprint(x))
   # skip if model is already in the database
   if (is_git2rdata("hibernation/hurdle", root = root)) {
     if (
@@ -897,7 +892,7 @@ extract_results.n2kHurdleImputed <- function(x, root, ...) {
       x@Hurdle@Covariate |>
         transmute(
           sublocation_id =
-            levels(.data$sublocation)[.data$sublocation] |>
+            levels(.data$sublocation_id)[.data$sublocation_id] |>
               as.integer(),
           winter = .data$winter
         ) |>
