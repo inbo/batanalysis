@@ -6,8 +6,8 @@
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom DBI dbGetQuery
-#' @importFrom dplyr anti_join bind_rows count filter inner_join semi_join
-#' transmute
+#' @importFrom dplyr anti_join bind_rows count distinct filter inner_join
+#' semi_join transmute
 #' @importFrom git2rdata write_vc
 #' @importFrom rlang .data
 import_raw_data <- function(origin, target, ignore = c("dead", "flying")) {
@@ -113,7 +113,8 @@ bat monitoring",
 
   total$observations |>
     semi_join(visits, by = "visit_id") |>
-    semi_join(species, by = c("species_id" = "id")) -> totals
+    semi_join(species, by = c("species_id" = "id")) |>
+    distinct() -> totals
   file.path("data", "hibernation", "totals") |>
     write_vc(
       x = totals, root = target, sorting = c("visit_id", "species_id"),
