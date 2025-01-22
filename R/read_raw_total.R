@@ -1,13 +1,16 @@
 #' Import the raw observations according to the totals based protocol
 #' @inheritParams import_raw_data
+#' @return A list with the visits, observations, and problems.
 #' @export
-#' @importFrom assertthat assert_that
+#' @importFrom assertthat assert_that noNA
 #' @importFrom dplyr anti_join bind_rows count distinct filter inner_join select
 #' transmute
 #' @importFrom DBI dbGetQuery
 #' @importFrom rlang .data
-read_raw_total <- function(origin) {
-  assert_that(inherits(origin, "Microsoft SQL Server"))
+read_raw_total <- function(origin, ignore = c("dead", "flying")) {
+  assert_that(
+    inherits(origin, "Microsoft SQL Server"), is.character(ignore), noNA(ignore)
+  )
   "SELECT
   v.location_id, sa.location_id AS sublocation_id, v.id AS visit_id,
   sa.id AS sample_id, v.start_date AS date, sa.not_counted, o.species_id,
@@ -25,7 +28,7 @@ WHERE
   pr.name = 'Vleermuizen - Wintertelling (totalen per telobject)' AND
   v.validation_status <> -1 AND v.analysis = 1" |>
     dbGetQuery(conn = origin) |>
-    filter(!.data$activity %in% c("awake", "dead", "flying")) -> raw_data
+    filter(!.data$activity %in% ignore) -> raw_data
   raw_data |>
     distinct(.data$visit_id, .data$location_id, .data$date) -> raw_visit
   raw_data |>

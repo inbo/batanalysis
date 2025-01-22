@@ -4,12 +4,15 @@
 \alias{import_raw_data}
 \title{Import the raw observations}
 \usage{
-import_raw_data(origin, target)
+import_raw_data(origin, target, ignore = c("dead", "flying"))
 }
 \arguments{
 \item{origin}{A \code{DBI} connection to the SQL Server database.}
 
 \item{target}{A \code{git_repository} object to store the imported data.}
+
+\item{ignore}{A character vector with the activities to ignore.
+Defaults to \code{c("dead", "flying")}.}
 }
 \description{
 Import the raw observations

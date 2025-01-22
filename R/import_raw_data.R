@@ -1,6 +1,8 @@
 #' Import the raw observations
 #' @param origin A `DBI` connection to the SQL Server database.
 #' @param target A `git_repository` object to store the imported data.
+#' @param ignore A character vector with the activities to ignore.
+#' Defaults to `c("dead", "flying")`.
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom DBI dbGetQuery
@@ -8,13 +10,13 @@
 #' transmute
 #' @importFrom git2rdata write_vc
 #' @importFrom rlang .data
-import_raw_data <- function(origin, target) {
+import_raw_data <- function(origin, target, ignore = c("dead", "flying")) {
   assert_that(
     inherits(origin, "Microsoft SQL Server"), inherits(target, "git_repository")
   )
-  individual <- read_raw_individual(origin = origin)
-  section <- read_raw_section(origin = origin)
-  total <- read_raw_total(origin = origin)
+  individual <- read_raw_individual(origin = origin, ignore = ignore)
+  section <- read_raw_section(origin = origin, ignore = ignore)
+  total <- read_raw_total(origin = origin, ignore = ignore)
   species <- read_raw_species(origin = origin)
   locations <- read_raw_location(origin = origin)
 

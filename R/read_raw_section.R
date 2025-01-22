@@ -6,7 +6,7 @@
 #' transmute
 #' @importFrom DBI dbGetQuery
 #' @importFrom rlang .data
-read_raw_section <- function(origin) {
+read_raw_section <- function(origin, ignore = c("dead", "flying")) {
   assert_that(inherits(origin, "Microsoft SQL Server"))
   "SELECT
   v.location_id, sa.location_id AS sublocation_id, v.id AS visit_id,
@@ -25,7 +25,7 @@ WHERE
   pr.name = 'Vleermuizen - Wintertelling (totalen per kamer/sectie)' AND
   v.validation_status <> -1 AND v.analysis = 1" |>
     dbGetQuery(conn = origin) |>
-    filter(!.data$activity %in% c("awake", "dead", "flying")) -> raw_data
+    filter(!.data$activity %in% ignore) -> raw_data
   raw_data |>
     distinct(.data$visit_id, .data$location_id, .data$date) -> raw_visit
   raw_data |>

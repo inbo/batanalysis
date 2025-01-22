@@ -4,10 +4,13 @@
 \alias{read_raw_section}
 \title{Import the raw observations according to the section based protocol}
 \usage{
-read_raw_section(origin)
+read_raw_section(origin, ignore = c("dead", "flying"))
 }
 \arguments{
 \item{origin}{A \code{DBI} connection to the SQL Server database.}
+
+\item{ignore}{A character vector with the activities to ignore.
+Defaults to \code{c("dead", "flying")}.}
 }
 \description{
 Import the raw observations according to the section based protocol
