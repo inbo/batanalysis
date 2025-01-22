@@ -50,49 +50,136 @@ WHERE
   pr.name = 'Vleermuizen - Wintertelling (totalen per telobject)' AND
   v.validation_status <> -1 AND sa.id IS NULL" |>
         dbGetQuery(conn = origin)
-    ) -> problems
-  bind_rows(visits, total$visits) |>
-    anti_join(problems, by = "visit_id") -> visits
-  write_vc(
-    visits, file = "hibernation/visits", sorting = "visit_id", stage = TRUE,
-    force = TRUE, root = target
-  )
+    ) |>
+    mutate(problem = factor(.data$problem)) -> problems
+
+  visits <- bind_rows(visits, total$visits)
+  file.path("data", "hibernation", "visits") |>
+    write_vc(
+      x = visits, sorting = "visit_id", stage = TRUE,
+      force = TRUE, root = target
+    )
+  file.path("data", "hibernation", "visits") |>
+    update_metadata(
+      stage = TRUE, force = TRUE, root = target, name = "visits",
+      title = "Available visits of the hibernating bat monitoring",
+      field_description = c(
+        visit_id = "Unique identifier of the visit", date = "Date of the visit",
+        location_id = "Unique identifier of the location"
+      )
+    )
 
   bind_rows(individual$samples, section$samples) |>
     semi_join(visits, by = "visit_id") -> samples
-  write_vc(
-    samples, file = "hibernation/samples", sorting = c("visit_id", "sample_id"),
-    stage = TRUE, force = TRUE, root = target
-  )
+  file.path("data", "hibernation", "samples") |>
+    write_vc(
+      x = samples, sorting = c("visit_id", "sample_id"), stage = TRUE,
+      force = TRUE, root = target
+    )
+  file.path("data", "hibernation", "samples") |>
+    update_metadata(
+      stage = TRUE, force = TRUE, root = target, name = "samples",
+      title =
+"Available visits at the sublocation level of the hibernating bat monitoring",
+      field_description = c(
+        visit_id = "Unique identifier of the visit",
+        sample_id = "Unique identifier of the sample",
+        sublocation_id = "Unique identifier of the sublocation"
+      )
+    )
 
   bind_rows(individual$observations, section$observations) |>
     semi_join(samples, by = "sample_id") |>
     semi_join(species, by = c("species_id" = "id")) -> observations
-  write_vc(
-    observations, file = "hibernation/observations", root = target,
-    sorting = c("sample_id", "species_id"), stage = TRUE, force = TRUE
-  )
+  file.path("data", "hibernation", "observations") |>
+    write_vc(
+      x = observations, root = target, sorting = c("sample_id", "species_id"),
+      stage = TRUE, force = TRUE
+    )
+  file.path("data", "hibernation", "observations") |>
+    update_metadata(
+      stage = TRUE, force = TRUE, root = target, name = "observations",
+      title =
+"Number of observed bats by species at the sublocation level of the hibernating
+bat monitoring",
+      field_description = c(
+        species_id = "Unique identifier of the species",
+        sample_id = "Unique identifier of the sample",
+        number = "Number of observed bats"
+      )
+    )
 
   total$observations |>
     semi_join(visits, by = "visit_id") |>
     semi_join(species, by = c("species_id" = "id")) -> totals
-  write_vc(
-    totals, file = "hibernation/totals", root = target,
-    sorting = c("visit_id", "species_id"), stage = TRUE, force = TRUE
-  )
+  file.path("data", "hibernation", "totals") |>
+    write_vc(
+      x = totals, root = target, sorting = c("visit_id", "species_id"),
+      stage = TRUE, force = TRUE
+    )
+  file.path("data", "hibernation", "totals") |>
+    update_metadata(
+      stage = TRUE, force = TRUE, root = target, name = "totals",
+      title =
+        "Total number of observed bats by species at the location level.
+Only given when no observations at the sublocation level are available.",
+      field_description = c(
+        visit_id = "Unique identifier of the visit",
+        species_id = "Unique identifier of the species",
+        total = "Total number of observed bats"
+      )
+    )
 
-  write_vc(
-    species, file = "hibernation/species", root = target, sorting = "id",
-    stage = TRUE, force = TRUE
-  )
+  file.path("data", "hibernation", "species") |>
+    write_vc(
+      x = species, root = target, sorting = "id", stage = TRUE, force = TRUE
+    )
+  file.path("data", "hibernation", "species") |>
+    update_metadata(
+      stage = TRUE, force = TRUE, root = target, name = "species",
+      title =
+        "Species observed during the hibernating bat monitoring",
+      field_description = c(
+        id = "Unique identifier of the species", name = "Dutch vernacular name",
+        scientific_name = "Scientific name of the species",
+        code = "Code of the species", parent = "Parent species"
+      )
+    )
 
-  write_vc(
-    locations, file = "hibernation/locations", root = target, sorting = "id",
-    stage = TRUE, force = TRUE
-  )
+  file.path("data", "hibernation", "locations") |>
+    write_vc(
+      x = locations, root = target, sorting = "id", stage = TRUE, force = TRUE,
+      digits = 6
+    )
+  file.path("data", "hibernation", "locations") |>
+    update_metadata(
+      stage = TRUE, force = TRUE, root = target, name = "locations",
+      title =
+    "Locations and sublocations observed during the hibernating bat monitoring",
+      field_description = c(
+        id = "Unique identifier of the location or sublocation",
+        name = "Name of the location or sublocation",
+        parent_id = "Parent location",
+        code = "Code of the location or sublocation",
+        longitude = "Longitude of the location or sublocation",
+        latitude = "Latitude of the location or sublocation"
+      )
+    )
 
-  write_vc(
-    problems, file = "hibernation/problems", sorting = c("visit_id", "problem"),
-    optimize = FALSE, root = target
-  )
+  file.path("data", "hibernation", "problems") |>
+    write_vc(
+      x = problems, sorting = c("visit_id", "problem"), optimize = FALSE,
+      root = target, stage = TRUE, force = TRUE
+    )
+  file.path("data", "hibernation", "problems") |>
+    update_metadata(
+      stage = TRUE, force = TRUE, root = target, name = "problems",
+      title =
+        "Issues found during the import of the hibernating bat monitoring data",
+      field_description = c(
+        visit_id = "Unique identifier of the visit",
+        location_id = "Unique identifier of the location",
+        problem = "Description of the issue"
+      )
+    )
 }
