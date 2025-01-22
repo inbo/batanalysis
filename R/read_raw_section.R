@@ -49,8 +49,6 @@ WHERE
         )
     ) -> problems
   raw_data |>
-    anti_join(problems, by = "visit_id") -> raw_data
-  raw_data |>
     distinct(.data$visit_id, .data$location_id, .data$date) -> visits
   raw_data |>
     filter(!.data$not_counted) |>
