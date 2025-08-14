@@ -71,8 +71,7 @@ WHERE
       )
     )
 
-  bind_rows(individual$samples, section$samples) |>
-    semi_join(visits, by = "visit_id") -> samples
+  samples <- bind_rows(individual$samples, section$samples)
   file.path("data", "hibernation", "samples") |>
     write_vc(
       x = samples, sorting = c("visit_id", "sample_id"), stage = TRUE,
@@ -90,9 +89,7 @@ WHERE
       )
     )
 
-  bind_rows(individual$observations, section$observations) |>
-    semi_join(samples, by = "sample_id") |>
-    semi_join(species, by = c("species_id" = "id")) -> observations
+  observations <- bind_rows(individual$observations, section$observations)
   file.path("data", "hibernation", "observations") |>
     write_vc(
       x = observations, root = target, sorting = c("sample_id", "species_id"),
@@ -111,14 +108,10 @@ bat monitoring",
       )
     )
 
-  total$observations |>
-    semi_join(visits, by = "visit_id") |>
-    semi_join(species, by = c("species_id" = "id")) |>
-    distinct() -> totals
   file.path("data", "hibernation", "totals") |>
     write_vc(
-      x = totals, root = target, sorting = c("visit_id", "species_id"),
-      stage = TRUE, force = TRUE
+      x = total$observations, root = target,
+      sorting = c("visit_id", "species_id"), stage = TRUE, force = TRUE
     )
   file.path("data", "hibernation", "totals") |>
     update_metadata(

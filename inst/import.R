@@ -7,7 +7,7 @@ sc <- c(
 sprintf("%s=%s;", names(sc), sc) |>
   paste(collapse = "") -> constring
 origin <- odbc::dbConnect(odbc::odbc(), .connection_string = constring)
-target <- "../batanalysis_data"
+target <- keyring::key_get("meetnetten", "batanalysis_data")
 if (file_test("-d", target)) {
   target <- git2rdata::repository(target)
 } else {
