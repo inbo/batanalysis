@@ -11,8 +11,11 @@ read_cluster <- function(cluster, target) {
   assert_that(file_test("-f", cluster))
   cluster <- readr::read_csv2(cluster)
   assert_that(
-    has_name(cluster, "cluster"), has_name(cluster, "code"),
-    is.numeric(cluster$cluster), noNA(cluster$cluster), noNA(cluster$code)
+    has_name(cluster, "cluster"),
+    has_name(cluster, "code"),
+    is.numeric(cluster$cluster),
+    noNA(cluster$cluster),
+    noNA(cluster$code)
   )
   cluster$cluster <- as.integer(cluster$cluster)
   cluster$code <- as.character(cluster$code)
@@ -33,7 +36,8 @@ read_cluster <- function(cluster, target) {
     sprintf(
       fmt = paste(
         "codes in `cluster` without matching `code` in `hibernation/location`:",
-        "%s", sep = "\n"
+        "%s",
+        sep = "\n"
       )
     ) -> msg
   assert_that(nrow(missing_code) == 0, msg = msg)
@@ -41,17 +45,24 @@ read_cluster <- function(cluster, target) {
     select("cluster", "code") |>
     inner_join(
       location |>
-        select("code", "id"), by = "code"
+        select("code", "id"),
+      by = "code"
     ) |>
     select(-"code") |>
     write_vc(
-      "hibernation/cluster_location", root = target, sorting = "id",
-      stage = TRUE, force = TRUE
+      "hibernation/cluster_location",
+      root = target,
+      sorting = "id",
+      stage = TRUE,
+      force = TRUE
     )
   cluster |>
     distinct(.data$cluster, .data$eurobats) |>
     write_vc(
-      "hibernation/cluster", root = target, sorting = "cluster",
-      stage = TRUE, force = TRUE
+      "hibernation/cluster",
+      root = target,
+      sorting = "cluster",
+      stage = TRUE,
+      force = TRUE
     )
 }

@@ -7,15 +7,17 @@
 #' @importFrom git2rdata read_vc
 get_child_species <- function(target, species) {
   assert_that(
-    inherits(target, "git_repository"), is.string(species), noNA(species)
+    inherits(target, "git_repository"),
+    is.string(species),
+    noNA(species)
   )
   read_vc("hibernation/species", root = target) |>
     select("code", "id", "parent") -> species_list
   species_list |>
     filter(.data$code == species) -> relevant_species
   stopifnot(
-    "`species` doesn't match with a single species" =
-      nrow(relevant_species) == 1
+    "`species` doesn't match with a single species" = nrow(relevant_species) ==
+      1
   )
   species_list |>
     semi_join(relevant_species, by = c("parent" = "id")) -> extra_species

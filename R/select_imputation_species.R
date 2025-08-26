@@ -15,7 +15,10 @@
 #' @importFrom rlang .data syms !!!
 #' @importFrom tidyr complete nesting unnest
 select_imputation_species <- function(
-  target, species = 545, start = as.Date("2000-07-01"), n_winter = 2
+  target,
+  species = 545,
+  start = as.Date("2000-07-01"),
+  n_winter = 2
 ) {
   assert_that(inherits(target, "git_repository"), is.date(start))
   read_vc("hibernation/visits", root = target) |>
@@ -31,7 +34,8 @@ select_imputation_species <- function(
     select(-"delta", -"date") -> visits
   visits |>
     inner_join(
-      read_vc("hibernation/samples", root = target), by = "visit_id"
+      read_vc("hibernation/samples", root = target),
+      by = "visit_id"
     ) |>
     left_join(
       read_vc("hibernation/observations", root = target) |>
@@ -41,14 +45,17 @@ select_imputation_species <- function(
       by = "sample_id"
     ) |>
     complete(
-      .data$winter, nesting(!!!syms(c("location_id", "sublocation_id")))
+      .data$winter,
+      nesting(!!!syms(c("location_id", "sublocation_id")))
     ) -> observations
   observations |>
     filter(!is.na(.data$number)) |>
     distinct(.data$location_id, .data$winter) |>
     group_by(.data$location_id) |>
     summarise(
-      winters = n(), first = min(.data$winter), last = max(.data$winter)
+      winters = n(),
+      first = min(.data$winter),
+      last = max(.data$winter)
     ) |>
     filter(.data$winters >= n_winter) |>
     transmute(.data$location_id, winter = map2(.data$first, .data$last, seq)) |>
@@ -59,7 +66,9 @@ select_imputation_species <- function(
     distinct(.data$location_id, .data$winter) |>
     group_by(.data$location_id) |>
     summarise(
-      winters = n(), first = min(.data$winter), last = max(.data$winter)
+      winters = n(),
+      first = min(.data$winter),
+      last = max(.data$winter)
     ) |>
     filter(.data$winters >= n_winter) |>
     transmute(.data$location_id, winter = map2(.data$first, .data$last, seq)) |>

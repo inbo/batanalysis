@@ -3,6 +3,7 @@
 #' @param target A `git_repository` object to store the imported data.
 #' @param ignore A character vector with the activities to ignore.
 #' Defaults to `c("dead", "flying")`.
+#' @inheritParams git2rdata::write_vc
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom DBI dbGetQuery
@@ -10,9 +11,15 @@
 #' semi_join transmute
 #' @importFrom git2rdata write_vc
 #' @importFrom rlang .data
-import_raw_data <- function(origin, target, ignore = c("dead", "flying")) {
+import_raw_data <- function(
+  origin,
+  target,
+  ignore = c("dead", "flying"),
+  strict = TRUE
+) {
   assert_that(
-    inherits(origin, "Microsoft SQL Server"), inherits(target, "git_repository")
+    inherits(origin, "Microsoft SQL Server"),
+    inherits(target, "git_repository")
   )
   individual <- read_raw_individual(origin = origin, ignore = ignore)
   section <- read_raw_section(origin = origin, ignore = ignore)
@@ -26,16 +33,19 @@ import_raw_data <- function(origin, target, ignore = c("dead", "flying")) {
     filter(.data$n > 1) |>
     inner_join(visits, by = c("location_id", "date")) |>
     transmute(
-      .data$visit_id, .data$location_id,
-      problem =
-        "duplicate visits between individual and section based protocols"
+      .data$visit_id,
+      .data$location_id,
+      problem = "duplicate visits between individual and section based protocols"
     ) |>
     bind_rows(
-      total$problem, individual$problem, section$problem,
+      total$problem,
+      individual$problem,
+      section$problem,
       total$visits |>
         semi_join(visits, by = c("location_id", "date")) |>
         transmute(
-          .data$visit_id, .data$location_id,
+          .data$visit_id,
+          .data$location_id,
           problem = paste(
             "duplicate visits between total based and individual or section",
             "based protocols"
@@ -58,15 +68,23 @@ WHERE
   visits <- bind_rows(visits, total$visits)
   file.path("data", "hibernation", "visits") |>
     write_vc(
-      x = visits, sorting = "visit_id", stage = TRUE,
-      force = TRUE, root = target
+      x = visits,
+      sorting = "visit_id",
+      stage = TRUE,
+      force = TRUE,
+      root = target,
+      strict = strict
     )
   file.path("data", "hibernation", "visits") |>
     update_metadata(
-      stage = TRUE, force = TRUE, root = target, name = "visits",
+      stage = TRUE,
+      force = TRUE,
+      root = target,
+      name = "visits",
       title = "Available visits of the hibernating bat monitoring",
       field_description = c(
-        visit_id = "Unique identifier of the visit", date = "Date of the visit",
+        visit_id = "Unique identifier of the visit",
+        date = "Date of the visit",
         location_id = "Unique identifier of the location"
       )
     )
@@ -74,14 +92,20 @@ WHERE
   samples <- bind_rows(individual$samples, section$samples)
   file.path("data", "hibernation", "samples") |>
     write_vc(
-      x = samples, sorting = c("visit_id", "sample_id"), stage = TRUE,
-      force = TRUE, root = target
+      x = samples,
+      sorting = c("visit_id", "sample_id"),
+      stage = TRUE,
+      force = TRUE,
+      root = target,
+      strict = strict
     )
   file.path("data", "hibernation", "samples") |>
     update_metadata(
-      stage = TRUE, force = TRUE, root = target, name = "samples",
-      title =
-"Available visits at the sublocation level of the hibernating bat monitoring",
+      stage = TRUE,
+      force = TRUE,
+      root = target,
+      name = "samples",
+      title = "Available visits at the sublocation level of the hibernating bat monitoring",
       field_description = c(
         visit_id = "Unique identifier of the visit",
         sample_id = "Unique identifier of the sample",
@@ -92,14 +116,20 @@ WHERE
   observations <- bind_rows(individual$observations, section$observations)
   file.path("data", "hibernation", "observations") |>
     write_vc(
-      x = observations, root = target, sorting = c("sample_id", "species_id"),
-      stage = TRUE, force = TRUE
+      x = observations,
+      root = target,
+      sorting = c("sample_id", "species_id"),
+      stage = TRUE,
+      force = TRUE,
+      strict = strict
     )
   file.path("data", "hibernation", "observations") |>
     update_metadata(
-      stage = TRUE, force = TRUE, root = target, name = "observations",
-      title =
-"Number of observed bats by species at the sublocation level of the hibernating
+      stage = TRUE,
+      force = TRUE,
+      root = target,
+      name = "observations",
+      title = "Number of observed bats by species at the sublocation level of the hibernating
 bat monitoring",
       field_description = c(
         species_id = "Unique identifier of the species",
@@ -110,14 +140,20 @@ bat monitoring",
 
   file.path("data", "hibernation", "totals") |>
     write_vc(
-      x = total$observations, root = target,
-      sorting = c("visit_id", "species_id"), stage = TRUE, force = TRUE
+      x = total$observations,
+      root = target,
+      sorting = c("visit_id", "species_id"),
+      stage = TRUE,
+      force = TRUE,
+      strict = strict
     )
   file.path("data", "hibernation", "totals") |>
     update_metadata(
-      stage = TRUE, force = TRUE, root = target, name = "totals",
-      title =
-        "Total number of observed bats by species at the location level.
+      stage = TRUE,
+      force = TRUE,
+      root = target,
+      name = "totals",
+      title = "Total number of observed bats by species at the location level.
 Only given when no observations at the sublocation level are available.",
       field_description = c(
         visit_id = "Unique identifier of the visit",
@@ -128,30 +164,46 @@ Only given when no observations at the sublocation level are available.",
 
   file.path("data", "hibernation", "species") |>
     write_vc(
-      x = species, root = target, sorting = "id", stage = TRUE, force = TRUE
+      x = species,
+      root = target,
+      sorting = "id",
+      stage = TRUE,
+      force = TRUE,
+      strict = strict
     )
   file.path("data", "hibernation", "species") |>
     update_metadata(
-      stage = TRUE, force = TRUE, root = target, name = "species",
-      title =
-        "Species observed during the hibernating bat monitoring",
+      stage = TRUE,
+      force = TRUE,
+      root = target,
+      name = "species",
+      title = "Species observed during the hibernating bat monitoring",
       field_description = c(
-        id = "Unique identifier of the species", name = "Dutch vernacular name",
+        id = "Unique identifier of the species",
+        name = "Dutch vernacular name",
         scientific_name = "Scientific name of the species",
-        code = "Code of the species", parent = "Parent species"
+        code = "Code of the species",
+        parent = "Parent species"
       )
     )
 
   file.path("data", "hibernation", "locations") |>
     write_vc(
-      x = locations, root = target, sorting = "id", stage = TRUE, force = TRUE,
-      digits = 6
+      x = locations,
+      root = target,
+      sorting = "id",
+      stage = TRUE,
+      force = TRUE,
+      digits = 6,
+      strict = strict
     )
   file.path("data", "hibernation", "locations") |>
     update_metadata(
-      stage = TRUE, force = TRUE, root = target, name = "locations",
-      title =
-    "Locations and sublocations observed during the hibernating bat monitoring",
+      stage = TRUE,
+      force = TRUE,
+      root = target,
+      name = "locations",
+      title = "Locations and sublocations observed during the hibernating bat monitoring",
       field_description = c(
         id = "Unique identifier of the location or sublocation",
         name = "Name of the location or sublocation",
@@ -164,14 +216,21 @@ Only given when no observations at the sublocation level are available.",
 
   file.path("data", "hibernation", "problems") |>
     write_vc(
-      x = problems, sorting = c("visit_id", "problem"), optimize = FALSE,
-      root = target, stage = TRUE, force = TRUE
+      x = problems,
+      sorting = c("visit_id", "problem"),
+      optimize = FALSE,
+      root = target,
+      stage = TRUE,
+      force = TRUE,
+      strict = strict
     )
   file.path("data", "hibernation", "problems") |>
     update_metadata(
-      stage = TRUE, force = TRUE, root = target, name = "problems",
-      title =
-        "Issues found during the import of the hibernating bat monitoring data",
+      stage = TRUE,
+      force = TRUE,
+      root = target,
+      name = "problems",
+      title = "Issues found during the import of the hibernating bat monitoring data",
       field_description = c(
         visit_id = "Unique identifier of the visit",
         location_id = "Unique identifier of the location",

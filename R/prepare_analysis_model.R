@@ -8,7 +8,10 @@
 #' store_manifest_yaml
 #' @importFrom purrr map_dfr
 prepare_analysis_model <- function(
-  analysis_data, base, max_dist = 10, project = "batanalysis",
+  analysis_data,
+  base,
+  max_dist = 10,
+  project = "batanalysis",
   overwrite = FALSE
 ) {
   assert_that(inherits(analysis_data, "git_repository"))
@@ -18,16 +21,23 @@ prepare_analysis_model <- function(
   species <- species[species != ""]
   map_dfr(
     species,
-    ~prepare_analysis_model_species(
-      species = .x, base = base, max_dist = max_dist, project = project,
-      overwrite = overwrite, analysis_data = analysis_data
+    ~ prepare_analysis_model_species(
+      species = .x,
+      base = base,
+      max_dist = max_dist,
+      project = project,
+      overwrite = overwrite,
+      analysis_data = analysis_data
     )
   ) |>
     n2k_manifest() |>
     store_manifest_yaml(
-      base = base, project = project, docker = "inbobmk/rn2k:dev-0.10",
+      base = base,
+      project = project,
+      docker = "inbobmk/rn2k:dev-0.10",
       dependencies = c(
-        "inbo/multimput@v0.2.14", "inbo/n2khelper@v0.5.0",
+        "inbo/multimput@v0.2.14",
+        "inbo/n2khelper@v0.5.0",
         "inbo/n2kanalysis@spde"
       )
     ) |>

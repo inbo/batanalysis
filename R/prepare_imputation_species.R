@@ -9,7 +9,9 @@
 #' @importFrom lubridate round_date year
 #' @importFrom rlang .data
 prepare_imputation_species <- function(
-  target, species = 545, start = as.Date("2000-07-01")
+  target,
+  species = 545,
+  start = as.Date("2000-07-01")
 ) {
   assert_that(inherits(target, "git_repository"), is.date(start))
   read_vc("hibernation/visits", root = target) |>
@@ -25,8 +27,9 @@ prepare_imputation_species <- function(
     select(-"delta", -"date") -> visits
   visits |>
     inner_join(
-      read_vc("hibernation/samples", root = target), by = "visit_id"
+      read_vc("hibernation/samples", root = target),
+      by = "visit_id"
     )
-    read_vc("hibernation/observations", root = target) |>
-      filter(.data$species_id == species)
+  read_vc("hibernation/observations", root = target) |>
+    filter(.data$species_id == species)
 }

@@ -22,13 +22,22 @@
 #' @importFrom rlang .data syms !!!
 #' @importFrom tidyr complete nesting replace_na unnest
 select_imputation_section <- function(
-  target, species = "Mmysbra", start = Sys.Date() - 12 * 365, n_present = 3,
+  target,
+  species = "Mmysbra",
+  start = Sys.Date() - 12 * 365,
+  n_present = 3,
   n_extrapolation = 5
 ) {
   assert_that(
-    inherits(target, "git_repository"), is.string(species), noNA(species),
-    is.date(start), noNA(start), is.count(n_present), noNA(n_present),
-    is.count(n_extrapolation), noNA(n_extrapolation)
+    inherits(target, "git_repository"),
+    is.string(species),
+    noNA(species),
+    is.date(start),
+    noNA(start),
+    is.count(n_present),
+    noNA(n_present),
+    is.count(n_extrapolation),
+    noNA(n_extrapolation)
   )
   relevant_species <- get_child_species(target = target, species = species)
   read_vc("hibernation/visits", root = target) |>
@@ -45,13 +54,16 @@ select_imputation_section <- function(
     select(-"delta", -"date") -> visits
   visits |>
     inner_join(
-      read_vc("hibernation/samples", root = target), by = "visit_id"
+      read_vc("hibernation/samples", root = target),
+      by = "visit_id"
     ) |>
     left_join(
       read_vc("hibernation/observations", root = target) |>
         mutate(
           number = ifelse(
-            .data$species_id %in% relevant_species$id, .data$number, 0L
+            .data$species_id %in% relevant_species$id,
+            .data$number,
+            0L
           )
         ) |>
         group_by(.data$sample_id) |>
@@ -78,7 +90,8 @@ select_imputation_section <- function(
       observations |>
         filter(.data$number > 0) |>
         select(observed = "winter", "sublocation_id"),
-      by = "sublocation_id", relationship = "many-to-many"
+      by = "sublocation_id",
+      relationship = "many-to-many"
     ) |>
     mutate(delta = abs(.data$winter - .data$observed)) |>
     filter(.data$delta <= n_extrapolation) |>

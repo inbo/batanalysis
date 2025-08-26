@@ -11,7 +11,11 @@
 #' @importFrom rlang .data
 #' @importFrom splines ns
 prepare_analysis_model_species <- function(
-  analysis_data, base, species, max_dist = 10, project = "batanalysis",
+  analysis_data,
+  base,
+  species,
+  max_dist = 10,
+  project = "batanalysis",
   overwrite = FALSE
 ) {
   file.path("hibernation", tolower(species), "locations") |>
@@ -38,12 +42,16 @@ prepare_analysis_model_species <- function(
     ) |>
     inner_join(location, by = "location_id") |>
     mutate(
-      llocation = .data$location_id, lsublocation = .data$sublocation_id,
-      qlocation = .data$location_id, qsublocation = .data$sublocation_id,
-      observation_id = .data$sample_id, datafield_id = "analysis_data",
+      llocation = .data$location_id,
+      lsublocation = .data$sublocation_id,
+      qlocation = .data$location_id,
+      qsublocation = .data$sublocation_id,
+      observation_id = .data$sample_id,
+      datafield_id = "analysis_data",
       cwinter = .data$winter + 1 - min(.data$winter),
       lwinter = (.data$cwinter - median(.data$cwinter)) / 10,
-      qwinter = .data$lwinter ^ 2, intercept = 1
+      qwinter = .data$lwinter^2,
+      intercept = 1
     ) -> dataset
   # model for presence of the species
   dataset |>
@@ -103,12 +111,19 @@ present ~ 0 + intercept +
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     )",
     model_type = "inla binomial: SPDE + Winter * (1 + Location + SubLocation)",
-    data = data, result_datasource_id = "git", scheme_id = "hibernating bats",
-    family = "binomial", species_group_id = species, spde = spde,
-    location_group_id = "Flanders", seed = 19911204,
+    data = data,
+    result_datasource_id = "git",
+    scheme_id = "hibernating bats",
+    family = "binomial",
+    species_group_id = species,
+    spde = spde,
+    location_group_id = "Flanders",
+    seed = 19911204,
     spde_prior = list(range = c(max_dist, 0.9), sigma = c(1, 0.01)),
-    first_imported_year = min(dataset$winter), analysis_date = rc$when,
-    last_imported_year = max(dataset$winter), imputation_size = 100
+    first_imported_year = min(dataset$winter),
+    analysis_date = rc$when,
+    last_imported_year = max(dataset$winter),
+    imputation_size = 100
   )
   store_model(presence, base = base, project = project, overwrite = overwrite)
 
@@ -146,14 +161,24 @@ present ~ 0 + intercept +
     ) |>
     left_join(location, by = "location_id") |>
     transmute(
-      .data$location_id, .data$sublocation_id,
-      llocation = .data$location_id, lsublocation = .data$sublocation_id,
-      qlocation = .data$location_id, qsublocation = .data$sublocation_id,
-      .data$number, intercept = 1, .data$X, .data$Y,
-      .data$winter, cwinter = .data$winter + 1 - min(dataset$winter),
+      .data$location_id,
+      .data$sublocation_id,
+      llocation = .data$location_id,
+      lsublocation = .data$sublocation_id,
+      qlocation = .data$location_id,
+      qsublocation = .data$sublocation_id,
+      .data$number,
+      intercept = 1,
+      .data$X,
+      .data$Y,
+      .data$winter,
+      cwinter = .data$winter + 1 - min(dataset$winter),
       lwinter = (.data$cwinter - median(.data$cwinter)) / 10,
-      qwinter = .data$lwinter ^ 2, lsubwinter = 0, qsubwinter = 0,
-      observation_id = .data$sample_id, datafield_id = "analysis_data"
+      qwinter = .data$lwinter^2,
+      lsubwinter = 0,
+      qsubwinter = 0,
+      observation_id = .data$sample_id,
+      datafield_id = "analysis_data"
     ) |>
     as.data.frame() -> extra
   count <- n2k_spde(
@@ -187,14 +212,21 @@ number ~ 0 + intercept +
       qsublocation, qsubwinter, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     )",
-    model_type =
-    "inla zeroinflatednbinomial0: SPDE + Winter * (1 + Location + SubLocation)",
-    data = data, result_datasource_id = "git", scheme_id = "hibernating bats",
-    family = "zeroinflatednbinomial0", species_group_id = species, spde = spde,
-    location_group_id = "Flanders", seed = 19911204, extra = extra,
+    model_type = "inla zeroinflatednbinomial0: SPDE + Winter * (1 + Location + SubLocation)",
+    data = data,
+    result_datasource_id = "git",
+    scheme_id = "hibernating bats",
+    family = "zeroinflatednbinomial0",
+    species_group_id = species,
+    spde = spde,
+    location_group_id = "Flanders",
+    seed = 19911204,
+    extra = extra,
     spde_prior = list(range = c(max_dist, 0.01), sigma = c(1, 0.01)),
-    first_imported_year = min(dataset$winter), analysis_date = rc$when,
-    last_imported_year = max(dataset$winter), imputation_size = 100,
+    first_imported_year = min(dataset$winter),
+    analysis_date = rc$when,
+    last_imported_year = max(dataset$winter),
+    imputation_size = 100,
     control = list(
       control.family = list(
         list(hyper = list(theta2 = list(initial = -20, fixed = TRUE)))
@@ -214,7 +246,9 @@ number ~ 0 + intercept +
     species_group_id = hurdle@AnalysisMetadata$species_group_id,
     location_group_id = hurdle@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter",
-    formula = "~winter", fun = sum, status = "waiting",
+    formula = "~winter",
+    fun = sum,
+    status = "waiting",
     parent = hurdle@AnalysisMetadata$file_fingerprint,
     first_imported_year = hurdle@AnalysisMetadata$first_imported_year,
     last_imported_year = hurdle@AnalysisMetadata$last_imported_year,
@@ -223,7 +257,10 @@ number ~ 0 + intercept +
     analysis_date = hurdle@AnalysisMetadata$analysis_date
   )
   store_model(
-    aggregated_tot, base = base, project = project, overwrite = overwrite
+    aggregated_tot,
+    base = base,
+    project = project,
+    overwrite = overwrite
   )
 
   extractor_fun <- function(model) {
@@ -244,7 +281,8 @@ number ~ 0 + intercept +
     }
     apply(model@AggregatedImputed@Imputation, 1, max) |>
       aggregate(
-        by = model@AggregatedImputed@Covariate["winter"], FUN = max
+        by = model@AggregatedImputed@Covariate["winter"],
+        FUN = max
       ) -> mi
     mi <- mi[order(mi$winter), ]
     winters <- mi$winter[cumsum(mi$x) > 0 & rev(cumsum(rev(mi$x))) > 0]
@@ -259,7 +297,8 @@ number ~ 0 + intercept +
       INLA::inla.make.lincombs() |>
       setNames(paste("total:", winters)) -> lc1
     comb <- expand.grid(
-      winter1 = factor(winters), winter2 = factor(winters)
+      winter1 = factor(winters),
+      winter2 = factor(winters)
     )
     comb <- comb[as.integer(comb$winter1) < as.integer(comb$winter2), ]
     comb$label <- sprintf("index: %s-%s", comb$winter2, comb$winter1)
@@ -275,28 +314,40 @@ number ~ 0 + intercept +
       INLA::inla.make.lincombs() |>
       setNames(comb$label) -> lc2
     n2kanalysis::moving_trend(
-      n_year = length(winters), duration = 12, first_year = min(winters)
+      n_year = length(winters),
+      duration = 12,
+      first_year = min(winters)
     ) |>
       rbind(
         n2kanalysis::moving_trend(
-          n_year = length(winters), duration = 10, first_year = min(winters)
+          n_year = length(winters),
+          duration = 10,
+          first_year = min(winters)
         ),
         n2kanalysis::moving_trend(
-          n_year = length(winters), duration = 6, first_year = min(winters)
+          n_year = length(winters),
+          duration = 6,
+          first_year = min(winters)
         ),
         n2kanalysis::moving_difference(
-          n_year = length(winters), duration = 6, first_year = min(winters)
+          n_year = length(winters),
+          duration = 6,
+          first_year = min(winters)
         )
       ) |>
       unique() -> lc3
     INLA::inla.make.lincombs(cwinter = lc3) |>
       setNames(rownames(lc3)) -> lc3
     n2kanalysis::moving_average(
-      n_year = length(winters), duration = 6, first_year = min(winters)
+      n_year = length(winters),
+      duration = 6,
+      first_year = min(winters)
     ) |>
       rbind(
         n2kanalysis::moving_average(
-          n_year = length(winters), duration = 12, first_year = min(winters)
+          n_year = length(winters),
+          duration = 12,
+          first_year = min(winters)
         )
       ) -> ma
     list("(Intercept)" = rep(1, nrow(ma)), cwinter = ma) |>
@@ -329,7 +380,10 @@ number ~ 0 + intercept +
     parent = aggregated_tot@AnalysisMetadata$file_fingerprint
   )
   store_model(
-    total_index, base = base, project = project, overwrite = overwrite
+    total_index,
+    base = base,
+    project = project,
+    overwrite = overwrite
   )
 
   # create the aggregate by winter and location
@@ -339,7 +393,9 @@ number ~ 0 + intercept +
     species_group_id = hurdle@AnalysisMetadata$species_group_id,
     location_group_id = hurdle@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter + location",
-    formula = "~winter + location_id", fun = sum, status = "waiting",
+    formula = "~winter + location_id",
+    fun = sum,
+    status = "waiting",
     parent = hurdle@AnalysisMetadata$file_fingerprint,
     first_imported_year = hurdle@AnalysisMetadata$first_imported_year,
     last_imported_year = hurdle@AnalysisMetadata$last_imported_year,
@@ -348,17 +404,22 @@ number ~ 0 + intercept +
     analysis_date = hurdle@AnalysisMetadata$analysis_date
   )
   store_model(
-    aggregated_location, base = base, project = project, overwrite = overwrite
+    aggregated_location,
+    base = base,
+    project = project,
+    overwrite = overwrite
   )
 
   bind_rows(
     data.frame(
       analysis = c(
-        get_file_fingerprint(presence), get_file_fingerprint(count)
+        get_file_fingerprint(presence),
+        get_file_fingerprint(count)
       )
     ),
     hurdle@AnalysisRelation,
-    aggregated_tot@AnalysisRelation, total_index@AnalysisRelation,
+    aggregated_tot@AnalysisRelation,
+    total_index@AnalysisRelation,
     aggregated_location@AnalysisRelation
   ) |>
     select(fingerprint = "analysis", parent = "parent_analysis")

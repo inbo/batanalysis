@@ -9,7 +9,9 @@
 #' @importFrom rlang .data
 read_raw_total <- function(origin, ignore = c("dead", "flying")) {
   assert_that(
-    inherits(origin, "Microsoft SQL Server"), is.character(ignore), noNA(ignore)
+    inherits(origin, "Microsoft SQL Server"),
+    is.character(ignore),
+    noNA(ignore)
   )
   "SELECT
   v.location_id, sa.location_id AS sublocation_id, v.id AS visit_id,
@@ -35,7 +37,8 @@ WHERE
     filter(.data$location_id != .data$sublocation_id) |>
     distinct(.data$visit_id, .data$location_id) |>
     transmute(
-      .data$visit_id, .data$location_id,
+      .data$visit_id,
+      .data$location_id,
       problem = "different sublocation and location in total based protocol"
     ) |>
     bind_rows(
@@ -44,7 +47,8 @@ WHERE
         count(.data$visit_id, .data$location_id) |>
         filter(.data$n > 1) |>
         transmute(
-          .data$visit_id, .data$location_id,
+          .data$visit_id,
+          .data$location_id,
           problem = "count and non-counted in total based protocol"
         ),
       raw_data |>
@@ -52,7 +56,8 @@ WHERE
         filter(.data$n > 1) |>
         distinct(.data$visit_id, .data$location_id) |>
         transmute(
-          .data$visit_id, .data$location_id,
+          .data$visit_id,
+          .data$location_id,
           problem = "duplicate species in total based protocol"
         ),
       raw_visit |>
@@ -60,7 +65,8 @@ WHERE
         filter(.data$n > 1) |>
         inner_join(raw_visit, by = c("location_id", "date")) |>
         transmute(
-          .data$visit_id, .data$location_id,
+          .data$visit_id,
+          .data$location_id,
           problem = "duplicate visit in total based protocol"
         )
     ) -> problems
@@ -72,7 +78,9 @@ WHERE
     select("visit_id", "species_id", total = "number") -> observations
   return(
     list(
-      visits = visits, observations = observations, problems = problems
+      visits = visits,
+      observations = observations,
+      problems = problems
     )
   )
 }

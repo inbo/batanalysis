@@ -10,13 +10,22 @@
 #' @importFrom git2rdata read_vc
 #' @importFrom lubridate round_date year
 select_imputation_total <- function(
-  target, species = "Mmysbra", start = Sys.Date() - 12 * 365,
-  n_present = 3, n_extrapolation = 5
+  target,
+  species = "Mmysbra",
+  start = Sys.Date() - 12 * 365,
+  n_present = 3,
+  n_extrapolation = 5
 ) {
   assert_that(
-    inherits(target, "git_repository"), is.string(species), noNA(species),
-    is.date(start), noNA(start), is.count(n_extrapolation),
-    noNA(n_extrapolation), is.count(n_present), noNA(n_present)
+    inherits(target, "git_repository"),
+    is.string(species),
+    noNA(species),
+    is.date(start),
+    noNA(start),
+    is.count(n_extrapolation),
+    noNA(n_extrapolation),
+    is.count(n_present),
+    noNA(n_present)
   )
   relevant_species <- get_child_species(target = target, species = species)
   read_vc("hibernation/visits", root = target) |>
@@ -32,21 +41,26 @@ select_imputation_total <- function(
     slice_min(.data$delta, n = 1, by = c("location_id", "winter")) |>
     select(-"delta", -"date") |>
     complete(
-      .data$location_id, winter = min(.data$winter):max(.data$winter)
+      .data$location_id,
+      winter = min(.data$winter):max(.data$winter)
     ) -> visits
   visits |>
     inner_join(
-      read_vc("hibernation/totals", root = target), by = "visit_id"
+      read_vc("hibernation/totals", root = target),
+      by = "visit_id"
     ) |>
     mutate(
       total = ifelse(
-        .data$species_id %in% relevant_species$id, .data$total, 0L
+        .data$species_id %in% relevant_species$id,
+        .data$total,
+        0L
       )
     ) |>
     group_by(.data$location_id, .data$winter) |>
     summarise(total = sum(.data$total), .groups = "drop") |>
     complete(
-      .data$location_id, winter = min(.data$winter):max(.data$winter)
+      .data$location_id,
+      winter = min(.data$winter):max(.data$winter)
     ) |>
     left_join(
       read_vc("hibernation/locations", root = target) |>
@@ -55,7 +69,8 @@ select_imputation_total <- function(
       by = "location_id"
     ) |>
     transmute(
-      .data$location_id, .data$winter,
+      .data$location_id,
+      .data$winter,
       minimum = ifelse(!is.na(.data$n), .data$total, NA),
       total = ifelse(is.na(.data$n), .data$total, NA)
     ) -> observations
@@ -73,7 +88,8 @@ select_imputation_total <- function(
       observations |>
         filter(.data$total > 0 | .data$minimum > 0) |>
         select(observed = "winter", "location_id"),
-      by = "location_id", relationship = "many-to-many"
+      by = "location_id",
+      relationship = "many-to-many"
     ) |>
     mutate(delta = abs(.data$winter - .data$observed)) |>
     filter(.data$delta <= n_extrapolation) |>

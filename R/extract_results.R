@@ -19,22 +19,36 @@ extract_results.default <- function(x, ...) {
 #' @importFrom n2kanalysis order_manifest read_manifest read_model
 #' @importFrom purrr walk
 extract_results.character <- function(
-  x, base, project = "batanalysis", raw_data, root, random = FALSE, ...
+  x,
+  base,
+  project = "batanalysis",
+  raw_data,
+  root,
+  random = FALSE,
+  ...
 ) {
   assert_that(is.string(x), noNA(x), is.flag(random), noNA(random))
   verify_vc(
-    "hibernation/species", root = raw_data,
+    "hibernation/species",
+    root = raw_data,
     variables = c("id", "code", "name", "scientific_name", "parent")
   ) |>
     write_vc(
-      "hibernation/species", root = root, sorting = "id", optimize = FALSE
+      "hibernation/species",
+      root = root,
+      sorting = "id",
+      optimize = FALSE
     )
   verify_vc(
-    "hibernation/locations", root = raw_data,
+    "hibernation/locations",
+    root = raw_data,
     variables = c("id", "code", "name", "parent_id")
   ) |>
     write_vc(
-      "hibernation/locations", root = root, sorting = "id", optimize = FALSE
+      "hibernation/locations",
+      root = root,
+      sorting = "id",
+      optimize = FALSE
     )
   read_manifest(base = base, project = project, hash = x) |>
     order_manifest() |>
@@ -88,47 +102,53 @@ extract_results.n2kModelImputed <- function(x, root, ...) {
   if (is_git2rdata("hibernation/difference", root = root)) {
     if (
       get_file_fingerprint(x) %in%
-      read_vc("hibernation/difference", root = root)$analysis
+        read_vc("hibernation/difference", root = root)$analysis
     ) {
       return(invisible(NULL))
     }
   }
   x@AnalysisMetadata |>
     select(
-      species = "species_group_id", "model_type", analysis = "file_fingerprint",
+      species = "species_group_id",
+      "model_type",
+      analysis = "file_fingerprint",
       fingerprint = "status_fingerprint"
     ) |>
     bind_cols(x@Results) -> results
   results |>
     filter(str_detect(.data$Parameter, "total")) |>
     transmute(
-      .data$species, .data$model_type, .data$analysis, .data$fingerprint,
+      .data$species,
+      .data$model_type,
+      .data$analysis,
+      .data$fingerprint,
       winter = str_remove(.data$Parameter, "total: ") |>
         as.integer(),
-      estimate = .data$Estimate, se = .data$SE
+      estimate = .data$Estimate,
+      se = .data$SE
     ) |>
     write_vc(
-      file = "hibernation/total_rw1", root = root, optimize = FALSE,
+      file = "hibernation/total_rw1",
+      root = root,
+      optimize = FALSE,
       append = TRUE,
       sorting = c("model_type", "species", "winter", "analysis")
     )
   update_metadata(
-    file = "hibernation/total_rw1", root = root, name = "hibernation_total_rw1",
-    title =
-      "Total number of hibernating bats modeled with a first order random walk",
-    description =
-"Model based on the total number of hibernating bats in the winter season.
+    file = "hibernation/total_rw1",
+    root = root,
+    name = "hibernation_total_rw1",
+    title = "Total number of hibernating bats modeled with a first order random walk",
+    description = "Model based on the total number of hibernating bats in the winter season.
 Missing values are imputed before calculating the total. The model is a first
 order random walk on the winter season with a negative binomial distribution.",
     field_description = c(
       species = "The code of the species group",
-      model_type =
-        "A short description of the model used to analyse the totals",
+      model_type = "A short description of the model used to analyse the totals",
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
       winter = "The winter season defined by the year in which January falls",
-      estimate =
-        "The estimated total number of hibernating bats on the log-scale",
+      estimate = "The estimated total number of hibernating bats on the log-scale",
       se = "The standard error of the estimate, also on the log-scale"
     )
   )
@@ -139,34 +159,39 @@ order random walk on the winter season with a negative binomial distribution.",
       patterns = c("index: ", target = "[0-9]*", "-", reference = "[0-9]*")
     ) |>
     select(
-      "species", "model_type", "analysis", "fingerprint", "reference", "target",
-      estimate = "Estimate", se = "SE"
+      "species",
+      "model_type",
+      "analysis",
+      "fingerprint",
+      "reference",
+      "target",
+      estimate = "Estimate",
+      se = "SE"
     ) |>
     mutate(across(c("reference", "target"), as.integer)) |>
     write_vc(
-      file = "hibernation/index", root = root, optimize = FALSE, append = TRUE,
+      file = "hibernation/index",
+      root = root,
+      optimize = FALSE,
+      append = TRUE,
       sorting = c("model_type", "species", "reference", "target", "analysis")
     )
   update_metadata(
-    file = "hibernation/index", root = root, name = "hibernation_index",
-    title =
-      "Relative change in total number of hibernating bats between two winters",
-    description =
-      "Model based on the total number of hibernating bats in the winter season.
+    file = "hibernation/index",
+    root = root,
+    name = "hibernation_index",
+    title = "Relative change in total number of hibernating bats between two winters",
+    description = "Model based on the total number of hibernating bats in the winter season.
 Missing values are imputed before calculating the total. The model is a first
 order random walk on the winter season with a negative binomial distribution.",
     field_description = c(
       species = "The code of the species group",
-      model_type =
-        "A short description of the model used to analyse the totals",
+      model_type = "A short description of the model used to analyse the totals",
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
-      reference =
-      "The reference winter season defined by the year in which January falls",
-      target =
-        "The target winter season defined by the year in which January falls",
-      estimate =
-"The log-ratio of the total number of hibernating bats in the target winter
+      reference = "The reference winter season defined by the year in which January falls",
+      target = "The target winter season defined by the year in which January falls",
+      estimate = "The log-ratio of the total number of hibernating bats in the target winter
 divided by those in the reference winter",
       se = "The standard error of the estimate, also on the log-scale"
     )
@@ -176,7 +201,10 @@ divided by those in the reference winter",
     separate_wider_regex(
       "Parameter",
       patterns = c(
-        "trend_", midpoint = "[0-9\\.]*", "_", duration = "[0-9]*"
+        "trend_",
+        midpoint = "[0-9\\.]*",
+        "_",
+        duration = "[0-9]*"
       )
     ) |>
     mutate(
@@ -184,30 +212,36 @@ divided by those in the reference winter",
       duration = as.integer(.data$duration)
     ) |>
     select(
-      "species", "model_type", "analysis", "fingerprint", "midpoint",
-      "duration", estimate = "Estimate", se = "SE"
+      "species",
+      "model_type",
+      "analysis",
+      "fingerprint",
+      "midpoint",
+      "duration",
+      estimate = "Estimate",
+      se = "SE"
     ) |>
     write_vc(
-      file = "hibernation/trend", root = root, optimize = FALSE,
+      file = "hibernation/trend",
+      root = root,
+      optimize = FALSE,
       append = TRUE,
       sorting = c("model_type", "species", "midpoint", "duration", "analysis")
     )
   update_metadata(
-    file = "hibernation/trend", root = root, name = "hibernation_trend",
-    title =
-      "Linear trend in total number of hibernating bats",
-    description =
-      "Model based on the total number of hibernating bats in the winter season.
+    file = "hibernation/trend",
+    root = root,
+    name = "hibernation_trend",
+    title = "Linear trend in total number of hibernating bats",
+    description = "Model based on the total number of hibernating bats in the winter season.
 Missing values are imputed before calculating the total. The model is a first
 order random walk on the winter season with a negative binomial distribution.",
     field_description = c(
       species = "The code of the species group",
-      model_type =
-        "A short description of the model used to analyse the totals",
+      model_type = "A short description of the model used to analyse the totals",
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
-      midpoint =
-"Central winter of the period over which the trend was calculated. The winter
+      midpoint = "Central winter of the period over which the trend was calculated. The winter
 season defined by the year in which January falls",
       duration = "Number of winters over which the trend was calculated",
       estimate = "The average change per winter on the log-scale",
@@ -219,7 +253,10 @@ season defined by the year in which January falls",
     separate_wider_regex(
       "Parameter",
       patterns = c(
-        "average_", midpoint = "[0-9\\.]*", "_", duration = "[0-9]*"
+        "average_",
+        midpoint = "[0-9\\.]*",
+        "_",
+        duration = "[0-9]*"
       )
     ) |>
     mutate(
@@ -227,30 +264,36 @@ season defined by the year in which January falls",
       duration = as.integer(.data$duration)
     ) |>
     select(
-      "species", "model_type", "analysis", "fingerprint", "midpoint",
-      "duration", estimate = "Estimate", se = "SE"
+      "species",
+      "model_type",
+      "analysis",
+      "fingerprint",
+      "midpoint",
+      "duration",
+      estimate = "Estimate",
+      se = "SE"
     ) |>
     write_vc(
-      file = "hibernation/average", root = root, optimize = FALSE,
+      file = "hibernation/average",
+      root = root,
+      optimize = FALSE,
       append = TRUE,
       sorting = c("model_type", "species", "midpoint", "duration", "analysis")
     )
   update_metadata(
-    file = "hibernation/average", root = root, name = "hibernation_average",
-    title =
-      "The average of total number of hibernating bats over a period",
-    description =
-      "Model based on the total number of hibernating bats in the winter season.
+    file = "hibernation/average",
+    root = root,
+    name = "hibernation_average",
+    title = "The average of total number of hibernating bats over a period",
+    description = "Model based on the total number of hibernating bats in the winter season.
 Missing values are imputed before calculating the total. The model is a first
 order random walk on the winter season with a negative binomial distribution.",
     field_description = c(
       species = "The code of the species group",
-      model_type =
-        "A short description of the model used to analyse the totals",
+      model_type = "A short description of the model used to analyse the totals",
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
-      midpoint =
-"Central winter of the period over which the average was calculated. The winter
+      midpoint = "Central winter of the period over which the average was calculated. The winter
 season defined by the year in which January falls",
       duration = "Number of winters over which the average was calculated",
       estimate = "The average on the log-scale",
@@ -262,7 +305,11 @@ season defined by the year in which January falls",
     separate_wider_regex(
       "Parameter",
       patterns = c(
-        "difference_", reference = "[0-9\\.]*", "_", target = "[0-9\\.]*", "_",
+        "difference_",
+        reference = "[0-9\\.]*",
+        "_",
+        target = "[0-9\\.]*",
+        "_",
         duration = "[0-9]*"
       )
     ) |>
@@ -271,41 +318,50 @@ season defined by the year in which January falls",
       duration = as.integer(.data$duration)
     ) |>
     select(
-      "species", "model_type", "analysis", "fingerprint", "reference", "target",
-      "duration", estimate = "Estimate", se = "SE"
+      "species",
+      "model_type",
+      "analysis",
+      "fingerprint",
+      "reference",
+      "target",
+      "duration",
+      estimate = "Estimate",
+      se = "SE"
     ) |>
     write_vc(
-      file = "hibernation/difference", root = root, optimize = FALSE,
+      file = "hibernation/difference",
+      root = root,
+      optimize = FALSE,
       append = TRUE,
       sorting = c(
-        "model_type", "species", "reference", "target", "duration", "analysis"
+        "model_type",
+        "species",
+        "reference",
+        "target",
+        "duration",
+        "analysis"
       )
     )
   update_metadata(
-    file = "hibernation/difference", root = root,
+    file = "hibernation/difference",
+    root = root,
     name = "hibernation_difference",
-    title =
-"Difference in average number of total number of hibernating bats of two
+    title = "Difference in average number of total number of hibernating bats of two
 periods.",
-    description =
-      "Model based on the total number of hibernating bats in the winter season.
+    description = "Model based on the total number of hibernating bats in the winter season.
 Missing values are imputed before calculating the total. The model is a first
 order random walk on the winter season with a negative binomial distribution.",
     field_description = c(
       species = "The code of the species group",
-      model_type =
-        "A short description of the model used to analyse the totals",
+      model_type = "A short description of the model used to analyse the totals",
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
-      reference =
-"The midpoint of reference winter season. The winter season defined by the year
+      reference = "The midpoint of reference winter season. The winter season defined by the year
 in which January falls",
-      target =
-"The midpoint of target winter season. The winter season defined by the year
+      target = "The midpoint of target winter season. The winter season defined by the year
 in which January falls",
       duration = "Number of winters over which the averages were calculated",
-      estimate =
-"The log-rate of the average of the target period divided by the reference
+      estimate = "The log-rate of the average of the target period divided by the reference
 period",
       se = "The standard error of the estimate, also on the log-scale"
     )
@@ -330,7 +386,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
   if (is_git2rdata("hibernation/total", root = root)) {
     if (
       get_file_fingerprint(x) %in%
-      read_vc("hibernation/total", root = root)$analysis
+        read_vc("hibernation/total", root = root)$analysis
     ) {
       return(invisible(NULL))
     }
@@ -338,18 +394,23 @@ extract_results.n2kAggregate <- function(x, root, ...) {
   x@AggregatedImputed@Covariate |>
     bind_cols(x@AggregatedImputed@Imputation) |>
     pivot_longer(
-      starts_with("Imputation"), names_to = "imputation", values_to = "total"
+      starts_with("Imputation"),
+      names_to = "imputation",
+      values_to = "total"
     ) -> results
   if (has_name(results, "location_id")) {
     x@AnalysisMetadata |>
       select(
-        species = "species_group_id", "model_type",
-        analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+        species = "species_group_id",
+        "model_type",
+        analysis = "file_fingerprint",
+        fingerprint = "status_fingerprint"
       ) |>
       bind_cols(
         results |>
           group_by(
-            winter = .data$winter, location = .data$location_id
+            winter = .data$winter,
+            location = .data$location_id
           ) |>
           summarise(
             mean = mean(.data$total, na.rm = TRUE),
@@ -361,47 +422,51 @@ extract_results.n2kAggregate <- function(x, root, ...) {
             p65 = quantile(.data$total, 0.65, na.rm = TRUE),
             p80 = quantile(.data$total, 0.8, na.rm = TRUE),
             p95 = quantile(.data$total, 0.95, na.rm = TRUE),
-            max = max(.data$total, na.rm = TRUE), .groups = "drop"
+            max = max(.data$total, na.rm = TRUE),
+            .groups = "drop"
           ) |>
           mutate(location = as.integer(levels(.data$location))[.data$location])
       ) |>
       write_vc(
-        file = "hibernation/total_location", root = root, optimize = FALSE,
+        file = "hibernation/total_location",
+        root = root,
+        optimize = FALSE,
         append = TRUE,
         sorting = c("model_type", "species", "winter", "location", "analysis")
       )
     update_metadata(
-      file = "hibernation/total_location", root = root,
+      file = "hibernation/total_location",
+      root = root,
       name = "hibernation_total_location",
       title = "The imputed total number of hibernating bats per location",
-      description =
-"The imputed total number of hibernating bats in the winter season per locaion.
+      description = "The imputed total number of hibernating bats in the winter season per locaion.
 Missing values are imputed before calculating the total. The model is a first
 order random walk on the winter season with a negative binomial distribution.",
       field_description = c(
         species = "The code of the species group",
-        model_type =
-          "A short description of the model used to calculate the totals",
+        model_type = "A short description of the model used to calculate the totals",
         analysis = "The file fingerprint of the analysis",
         fingerprint = "The status fingerprint of the analysis",
         winter = "The winter season defined by the year in which January falls",
         mean = "The average of the imputed total number of hibernating bats",
         min = "The minimum of the imputed total number of hibernating bats",
         p05 = "The 5% quantile of the imputed total number of hibernating bats",
-      p20 = "The 20% quantile of the imputed total number of hibernating bats",
-      p35 = "The 35% quantile of the imputed total number of hibernating bats",
-      p50 = "The 50% quantile of the imputed total number of hibernating bats",
-      p65 = "The 65% quantile of the imputed total number of hibernating bats",
-      p80 = "The 80% quantile of the imputed total number of hibernating bats",
-      p95 = "The 95% quantile of the imputed total number of hibernating bats",
+        p20 = "The 20% quantile of the imputed total number of hibernating bats",
+        p35 = "The 35% quantile of the imputed total number of hibernating bats",
+        p50 = "The 50% quantile of the imputed total number of hibernating bats",
+        p65 = "The 65% quantile of the imputed total number of hibernating bats",
+        p80 = "The 80% quantile of the imputed total number of hibernating bats",
+        p95 = "The 95% quantile of the imputed total number of hibernating bats",
         max = "The maximum of the imputed total number of hibernating bats"
       )
     )
   } else {
     x@AnalysisMetadata |>
       select(
-        species = "species_group_id", "model_type",
-        analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+        species = "species_group_id",
+        "model_type",
+        analysis = "file_fingerprint",
+        fingerprint = "status_fingerprint"
       ) |>
       bind_cols(
         results |>
@@ -420,33 +485,35 @@ order random walk on the winter season with a negative binomial distribution.",
           )
       ) |>
       write_vc(
-        file = "hibernation/total", root = root, optimize = FALSE,
+        file = "hibernation/total",
+        root = root,
+        optimize = FALSE,
         append = TRUE,
         sorting = c("model_type", "species", "winter", "analysis")
       )
     update_metadata(
-      file = "hibernation/total", root = root, name = "hibernation_total",
+      file = "hibernation/total",
+      root = root,
+      name = "hibernation_total",
       title = "The imputed total number of hibernating bats",
-      description =
-"The imputed total number of hibernating bats in the winter season.
+      description = "The imputed total number of hibernating bats in the winter season.
 Missing values are imputed before calculating the total. The model is a first
 order random walk on the winter season with a negative binomial distribution.",
       field_description = c(
         species = "The code of the species group",
-        model_type =
-          "A short description of the model used to calculate the totals",
+        model_type = "A short description of the model used to calculate the totals",
         analysis = "The file fingerprint of the analysis",
         fingerprint = "The status fingerprint of the analysis",
         winter = "The winter season defined by the year in which January falls",
         mean = "The average of the imputed total number of hibernating bats",
         min = "The minimum of the imputed total number of hibernating bats",
-      p05 = "The 5% quantile of the imputed total number of hibernating bats",
-      p20 = "The 20% quantile of the imputed total number of hibernating bats",
-      p35 = "The 35% quantile of the imputed total number of hibernating bats",
-      p50 = "The 50% quantile of the imputed total number of hibernating bats",
-      p65 = "The 65% quantile of the imputed total number of hibernating bats",
-      p80 = "The 80% quantile of the imputed total number of hibernating bats",
-      p95 = "The 95% quantile of the imputed total number of hibernating bats",
+        p05 = "The 5% quantile of the imputed total number of hibernating bats",
+        p20 = "The 20% quantile of the imputed total number of hibernating bats",
+        p35 = "The 35% quantile of the imputed total number of hibernating bats",
+        p50 = "The 50% quantile of the imputed total number of hibernating bats",
+        p65 = "The 65% quantile of the imputed total number of hibernating bats",
+        p80 = "The 80% quantile of the imputed total number of hibernating bats",
+        p95 = "The 95% quantile of the imputed total number of hibernating bats",
         max = "The maximum of the imputed total number of hibernating bats"
       )
     )
@@ -490,13 +557,15 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     map("latent") |>
     map2_dfc(
       seq_len(n_sim),
-      ~sprintf("sim_%04i", .y) |>
+      ~ sprintf("sim_%04i", .y) |>
         `colnames<-`(.x, value = _) |>
         as.data.frame()
     ) |>
     rownames_to_column(var = "parameter") |>
     pivot_longer(
-      -"parameter", names_to = "sim", values_to = "estimate"
+      -"parameter",
+      names_to = "sim",
+      values_to = "estimate"
     ) -> post_sample
   # extract the intercept and the cwinter effect
   post_sample |>
@@ -507,41 +576,49 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     mutate(
       cwinter = str_remove(.data$parameter, "cwinter:") |>
         as.integer(),
-      .data$sim, .data$estimate
+      .data$sim,
+      .data$estimate
     ) |>
     inner_join(ps_intercept, by = "sim") |>
     transmute(
-      .data$cwinter, .data$sim, estimate = .data$intercept + .data$estimate
+      .data$cwinter,
+      .data$sim,
+      estimate = .data$intercept + .data$estimate
     ) -> ps_cwinter
   x@AnalysisMetadata |>
     select(
-      species = "species_group_id", "model_type",
-      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+      species = "species_group_id",
+      "model_type",
+      analysis = "file_fingerprint",
+      fingerprint = "status_fingerprint"
     ) |>
     bind_cols(
       ps_cwinter |>
         group_by(.data$cwinter) |>
         summarise(
           across(
-            "estimate", .names = "{.fn}",
+            "estimate",
+            .names = "{.fn}",
             list(
-              mean = ~mean(.x, na.rm = TRUE) |>
+              mean = ~ mean(.x, na.rm = TRUE) |>
                 round(4),
-              sd = ~sd(.x, na.rm = TRUE) |>
+              sd = ~ sd(.x, na.rm = TRUE) |>
                 round(4)
             )
           )
         )
     ) |>
     write_vc(
-      file = "model_check/cwinter", root = root, append = TRUE,
+      file = "model_check/cwinter",
+      root = root,
+      append = TRUE,
       sorting = c("model_type", "species", "cwinter", "analysis")
     )
   ps_cwinter |>
     distinct(.data$cwinter) |>
     mutate(
       lwinter = (.data$cwinter - median(.data$cwinter)) / 10,
-      qwinter = .data$lwinter ^ 2
+      qwinter = .data$lwinter^2
     ) -> q_winter
 
   # extract the location specific effects
@@ -560,14 +637,16 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     distinct() |>
     filter(!is.na(.data$X)) -> loc_coordinates
   projector <- inla.mesh.projector(
-    mesh = spde2mesh(x@Spde), loc = as.matrix(loc_coordinates[, c("X", "Y")])
+    mesh = spde2mesh(x@Spde),
+    loc = as.matrix(loc_coordinates[, c("X", "Y")])
   )
   post_sample |>
     filter(str_detect(.data$parameter, "^location_id:")) |>
     transmute(
       location_id = str_remove(.data$parameter, "location_id:") |>
         as.integer(),
-      .data$sim, q0 = .data$estimate
+      .data$sim,
+      q0 = .data$estimate
     ) |>
     inner_join(
       post_sample |>
@@ -575,7 +654,8 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         transmute(
           location_id = str_remove(.data$parameter, "llocation:") |>
             as.integer(),
-          .data$sim, q1 = .data$estimate
+          .data$sim,
+          q1 = .data$estimate
         ),
       by = c("location_id", "sim")
     ) |>
@@ -585,7 +665,8 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         transmute(
           location_id = str_remove(.data$parameter, "qlocation:") |>
             as.integer(),
-          .data$sim, q2 = .data$estimate
+          .data$sim,
+          q2 = .data$estimate
         ),
       by = c("location_id", "sim")
     ) |>
@@ -606,8 +687,10 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     ) -> ps_location
   x@AnalysisMetadata |>
     select(
-      species = "species_group_id", "model_type",
-      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+      species = "species_group_id",
+      "model_type",
+      analysis = "file_fingerprint",
+      fingerprint = "status_fingerprint"
     ) |>
     bind_cols(
       ps_location |>
@@ -616,18 +699,20 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
           across(
             c("q0", "q1", "q2", "mesh"),
             list(
-              mean = ~mean(.x, na.rm = TRUE) |>
+              mean = ~ mean(.x, na.rm = TRUE) |>
                 round(4),
-              sd = ~sd(.x, na.rm = TRUE) |>
+              sd = ~ sd(.x, na.rm = TRUE) |>
                 round(4)
             )
           )
         )
-  ) |>
-  write_vc(
-    file = "model_check/location_effect", root = root, append = TRUE,
-    sorting = c("model_type", "species", "location_id", "analysis")
-  )
+    ) |>
+    write_vc(
+      file = "model_check/location_effect",
+      root = root,
+      append = TRUE,
+      sorting = c("model_type", "species", "location_id", "analysis")
+    )
 
   # predictions at the location level
   ps_location |>
@@ -635,15 +720,21 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     unnest("cwinter") |>
     inner_join(ps_cwinter, by = c("cwinter", "sim")) |>
     transmute(
-      .data$location_id, .data$cwinter, .data$sim,
-      relative = .data$q0 + .data$q1 * .data$lwinter +
-        .data$q2 * .data$qwinter + .data$mesh,
+      .data$location_id,
+      .data$cwinter,
+      .data$sim,
+      relative = .data$q0 +
+        .data$q1 * .data$lwinter +
+        .data$q2 * .data$qwinter +
+        .data$mesh,
       absolute = .data$estimate + .data$relative
     ) -> ps_location
   x@AnalysisMetadata |>
     select(
-      species = "species_group_id", "model_type",
-      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+      species = "species_group_id",
+      "model_type",
+      analysis = "file_fingerprint",
+      fingerprint = "status_fingerprint"
     ) |>
     bind_cols(
       ps_location |>
@@ -652,9 +743,9 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
           across(
             c("relative", "absolute"),
             list(
-              mean = ~mean(.x, na.rm = TRUE) |>
+              mean = ~ mean(.x, na.rm = TRUE) |>
                 round(4),
-              sd = ~sd(.x, na.rm = TRUE) |>
+              sd = ~ sd(.x, na.rm = TRUE) |>
                 round(4)
             )
           ),
@@ -662,7 +753,9 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         )
     ) |>
     write_vc(
-      file = "model_check/location", root = root, append = TRUE,
+      file = "model_check/location",
+      root = root,
+      append = TRUE,
       sorting = c("model_type", "species", "location_id", "cwinter", "analysis")
     )
 
@@ -672,7 +765,8 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     transmute(
       sublocation_id = str_remove(.data$parameter, "sublocation_id:") |>
         as.integer(),
-      .data$sim, q0 = .data$estimate
+      .data$sim,
+      q0 = .data$estimate
     ) |>
     inner_join(
       post_sample |>
@@ -680,7 +774,8 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         transmute(
           sublocation_id = str_remove(.data$parameter, "lsublocation:") |>
             as.integer(),
-          .data$sim, q1 = .data$estimate
+          .data$sim,
+          q1 = .data$estimate
         ),
       by = c("sublocation_id", "sim")
     ) |>
@@ -690,51 +785,60 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         transmute(
           sublocation_id = str_remove(.data$parameter, "qsublocation:") |>
             as.integer(),
-          .data$sim, q2 = .data$estimate
+          .data$sim,
+          q2 = .data$estimate
         ),
       by = c("sublocation_id", "sim")
     ) |>
     mutate(q2 = replace_na(.data$q2, 0)) -> ps_sublocation
   x@AnalysisMetadata |>
     select(
-      species = "species_group_id", "model_type",
-      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+      species = "species_group_id",
+      "model_type",
+      analysis = "file_fingerprint",
+      fingerprint = "status_fingerprint"
     ) |>
     bind_cols(
       ps_sublocation |>
         mutate(
-          sublocation_id =
-            levels(x@Model$.args$data$sublocation)[.data$sublocation_id]
+          sublocation_id = levels(x@Model$.args$data$sublocation)[
+            .data$sublocation_id
+          ]
         ) |>
         group_by(sublocation_id = as.integer(.data$sublocation_id)) |>
         summarise(
           across(
             c("q0", "q1", "q2"),
             list(
-              mean = ~mean(.x, na.rm = TRUE) |>
+              mean = ~ mean(.x, na.rm = TRUE) |>
                 round(4),
-              sd = ~sd(.x, na.rm = TRUE) |>
+              sd = ~ sd(.x, na.rm = TRUE) |>
                 round(4)
             )
           )
         )
     ) |>
     write_vc(
-      file = "model_check/sublocation_effect", root = root, append = TRUE,
+      file = "model_check/sublocation_effect",
+      root = root,
+      append = TRUE,
       sorting = c("model_type", "species", "sublocation_id", "analysis")
     )
 
   # predictions at the sublocation level
   x@AnalysisMetadata |>
     select(
-      species = "species_group_id", "model_type",
-      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+      species = "species_group_id",
+      "model_type",
+      analysis = "file_fingerprint",
+      fingerprint = "status_fingerprint"
     ) |>
     bind_cols(
       ps_sublocation |>
         mutate(
-          sublocation_id =
-            levels(x@Model$.args$data$sublocation)[.data$sublocation_id] |>
+          sublocation_id = levels(x@Model$.args$data$sublocation)[
+            .data$sublocation_id
+          ] |>
             as.integer(),
           cwinter = list(q_winter)
         ) |>
@@ -742,7 +846,7 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         inner_join(
           read_vc("hibernation/locations", root = root) |>
             select(sublocation_id = "id", location_id = "parent_id"),
-           by = "sublocation_id"
+          by = "sublocation_id"
         ) |>
         inner_join(
           ps_location |>
@@ -750,8 +854,11 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
           by = c("location_id", "cwinter", "sim")
         ) |>
         transmute(
-          .data$sublocation_id, .data$sim, .data$cwinter,
-          relative = .data$q0 + .data$q1 * .data$lwinter +
+          .data$sublocation_id,
+          .data$sim,
+          .data$cwinter,
+          relative = .data$q0 +
+            .data$q1 * .data$lwinter +
             .data$q2 * .data$qwinter,
           absolute = .data$absolute + .data$relative
         ) |>
@@ -760,9 +867,9 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
           across(
             c("relative", "absolute"),
             list(
-              mean = ~mean(.x, na.rm = TRUE) |>
+              mean = ~ mean(.x, na.rm = TRUE) |>
                 round(4),
-              sd = ~sd(.x, na.rm = TRUE) |>
+              sd = ~ sd(.x, na.rm = TRUE) |>
                 round(4)
             )
           ),
@@ -770,17 +877,25 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         )
     ) |>
     write_vc(
-      file = "model_check/sublocation", root = root, append = TRUE,
+      file = "model_check/sublocation",
+      root = root,
+      append = TRUE,
       sorting = c(
-        "model_type", "species", "sublocation_id", "cwinter", "analysis"
+        "model_type",
+        "species",
+        "sublocation_id",
+        "cwinter",
+        "analysis"
       )
     )
 
   # hyperparameters
   x@AnalysisMetadata |>
     select(
-      species = "species_group_id", "model_type",
-      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+      species = "species_group_id",
+      "model_type",
+      analysis = "file_fingerprint",
+      fingerprint = "status_fingerprint"
     ) |>
     bind_cols(
       names(x@Model$marginals.hyperpar) |>
@@ -791,23 +906,29 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
               inla.zmarginal(x@Model$marginals.hyperpar[[7]], silent = TRUE) |>
                 as.data.frame() |>
                 transmute(
-                  parameter = y, .data$mean,
-                  lcl = .data$quant0.025, ucl = .data$quant0.975
+                  parameter = y,
+                  .data$mean,
+                  lcl = .data$quant0.025,
+                  ucl = .data$quant0.975
                 ) -> z
               return(z)
             }
             x@Model$marginals.hyperpar[[y]] |>
               prec2sd() |>
               transmute(
-                parameter = gsub("Precision", "Stdev", y), .data$mean,
-                lcl = .data$quant0.025, ucl = .data$quant0.975
+                parameter = gsub("Precision", "Stdev", y),
+                .data$mean,
+                lcl = .data$quant0.025,
+                ucl = .data$quant0.975
               )
           }
         ) |>
         bind_rows()
     ) |>
     write_vc(
-      file = "model_check/hyperparameters", root = root, append = TRUE,
+      file = "model_check/hyperparameters",
+      root = root,
+      append = TRUE,
       sorting = c("model_type", "species", "parameter", "analysis")
     )
 
@@ -823,28 +944,33 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     as.data.frame() |>
     mutate(field_id = row_number()) -> sample_field
   projector <- inla.mesh.projector(
-    mesh = mesh, loc = as.matrix(sample_field[, c("X", "Y")])
+    mesh = mesh,
+    loc = as.matrix(sample_field[, c("X", "Y")])
   )
   x@AnalysisMetadata |>
     select(
-      species = "species_group_id", "model_type",
-      analysis = "file_fingerprint", fingerprint = "status_fingerprint"
+      species = "species_group_id",
+      "model_type",
+      analysis = "file_fingerprint",
+      fingerprint = "status_fingerprint"
     ) |>
     bind_cols(
       as.matrix(projector$proj$A %*% ps_matern) |>
         as.data.frame() |>
         mutate(field_id = sample_field$field_id) |>
         pivot_longer(
-          starts_with("sim"), names_to = "sim", values_to = "mesh"
+          starts_with("sim"),
+          names_to = "sim",
+          values_to = "mesh"
         ) |>
         group_by(.data$field_id) |>
         summarise(
           across(
             "mesh",
             list(
-              mean = ~mean(.x, na.rm = TRUE) |>
+              mean = ~ mean(.x, na.rm = TRUE) |>
                 round(4),
-              sd = ~sd(.x, na.rm = TRUE) |>
+              sd = ~ sd(.x, na.rm = TRUE) |>
                 round(4)
             )
           ),
@@ -853,13 +979,23 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         inner_join(sample_field, by = "field_id")
     ) |>
     write_vc(
-      file = "model_check/mesh_prediction", root = root, append = TRUE,
+      file = "model_check/mesh_prediction",
+      root = root,
+      append = TRUE,
       sorting = c("model_type", "species", "X", "Y", "analysis")
     )
 
   rm(
-    loc_coordinates, post_sample, projector, ps_cwinter, ps_intercept,
-    ps_location, ps_matern, ps_sublocation, q_winter, x
+    loc_coordinates,
+    post_sample,
+    projector,
+    ps_cwinter,
+    ps_intercept,
+    ps_location,
+    ps_matern,
+    ps_sublocation,
+    q_winter,
+    x
   )
   gc(verbose = FALSE)
   return(invisible(NULL))
@@ -878,42 +1014,46 @@ extract_results.n2kHurdleImputed <- function(x, root, ...) {
   if (is_git2rdata("hibernation/hurdle", root = root)) {
     if (
       get_file_fingerprint(x) %in%
-      read_vc("hibernation/hurdle", root = root)$analysis
+        read_vc("hibernation/hurdle", root = root)$analysis
     ) {
       return(invisible(NULL))
     }
   }
   x@AnalysisMetadata |>
     select(
-      species = "species_group_id", "model_type", analysis = "file_fingerprint",
+      species = "species_group_id",
+      "model_type",
+      analysis = "file_fingerprint",
       fingerprint = "status_fingerprint"
     ) |>
     bind_cols(
       x@Hurdle@Covariate |>
         transmute(
-          sublocation_id =
-            levels(.data$sublocation_id)[.data$sublocation_id] |>
-              as.integer(),
+          sublocation_id = levels(.data$sublocation_id)[.data$sublocation_id] |>
+            as.integer(),
           winter = .data$winter
         ) |>
         bind_cols(x@Hurdle@Imputation) |>
         pivot_longer(
-          starts_with("Imputation"), names_to = "imputation",
+          starts_with("Imputation"),
+          names_to = "imputation",
           values_to = "number"
         ) |>
         group_by(.data$sublocation_id, .data$winter) |>
         summarise(
           across(
-            "number", .names = "{.fn}",
+            "number",
+            .names = "{.fn}",
             list(
-              mean = ~mean(.x, na.rm = TRUE), sd = ~sd(.x, na.rm = TRUE),
-              p05 = ~quantile(.x, 0.05, na.rm = TRUE),
-              p20 = ~quantile(.x, 0.20, na.rm = TRUE),
-              p35 = ~quantile(.x, 0.35, na.rm = TRUE),
-              p50 = ~quantile(.x, 0.50, na.rm = TRUE),
-              p65 = ~quantile(.x, 0.65, na.rm = TRUE),
-              p80 = ~quantile(.x, 0.80, na.rm = TRUE),
-              p95 = ~quantile(.x, 0.95, na.rm = TRUE)
+              mean = ~ mean(.x, na.rm = TRUE),
+              sd = ~ sd(.x, na.rm = TRUE),
+              p05 = ~ quantile(.x, 0.05, na.rm = TRUE),
+              p20 = ~ quantile(.x, 0.20, na.rm = TRUE),
+              p35 = ~ quantile(.x, 0.35, na.rm = TRUE),
+              p50 = ~ quantile(.x, 0.50, na.rm = TRUE),
+              p65 = ~ quantile(.x, 0.65, na.rm = TRUE),
+              p80 = ~ quantile(.x, 0.80, na.rm = TRUE),
+              p95 = ~ quantile(.x, 0.95, na.rm = TRUE)
             )
           ),
           .groups = "drop"
@@ -921,10 +1061,16 @@ extract_results.n2kHurdleImputed <- function(x, root, ...) {
         mutate(delta = .data$p95 - .data$p05)
     ) |>
     write_vc(
-      file = "hibernation/hurdle", root = root, optimize = FALSE,
+      file = "hibernation/hurdle",
+      root = root,
+      optimize = FALSE,
       append = TRUE,
       sorting = c(
-        "model_type", "species", "sublocation_id", "winter", "analysis"
+        "model_type",
+        "species",
+        "sublocation_id",
+        "winter",
+        "analysis"
       )
     )
   rm(x)

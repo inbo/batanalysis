@@ -4,7 +4,7 @@
 \alias{import_raw_data}
 \title{Import the raw observations}
 \usage{
-import_raw_data(origin, target, ignore = c("dead", "flying"))
+import_raw_data(origin, target, ignore = c("dead", "flying"), strict = TRUE)
 }
 \arguments{
 \item{origin}{A \code{DBI} connection to the SQL Server database.}
@@ -13,6 +13,11 @@ import_raw_data(origin, target, ignore = c("dead", "flying"))
 
 \item{ignore}{A character vector with the activities to ignore.
 Defaults to \code{c("dead", "flying")}.}
+
+\item{strict}{What to do when the metadata changes. \code{strict = FALSE}
+overwrites the data and the metadata with a warning listing the changes,
+\code{strict = TRUE} returns an error and leaves the data and metadata as is.
+Defaults to \code{TRUE}.}
 }
 \description{
 Import the raw observations

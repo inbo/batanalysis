@@ -12,12 +12,22 @@
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
 #' @importFrom tidyr complete nesting
 prepare_analysis_data_species <- function(
-  raw_data, analysis_data, species, start, n_winter = 4, n_present = 3,
-  n_extrapolation = 5, strict = TRUE
+  raw_data,
+  analysis_data,
+  species,
+  start,
+  n_winter = 4,
+  n_present = 3,
+  n_extrapolation = 5,
+  strict = TRUE
 ) {
   assert_that(
-    is.number(start), is.count(n_winter), is.count(n_present), noNA(start),
-    noNA(n_winter), noNA(n_present)
+    is.number(start),
+    is.count(n_winter),
+    is.count(n_present),
+    noNA(start),
+    noNA(n_winter),
+    noNA(n_present)
   )
   sprintf("%i-10-01", start - 1) |>
     as.Date() -> start
@@ -30,16 +40,22 @@ prepare_analysis_data_species <- function(
   stopifnot("No matching species found" = nrow(this_species) > 0)
   message("Preparing the data for ", this_species$scientific_name[1])
   sections <- select_imputation_section(
-    target = raw_data, species = species, start = as.Date(start),
-    n_present = 1, n_extrapolation = n_extrapolation
+    target = raw_data,
+    species = species,
+    start = as.Date(start),
+    n_present = 1,
+    n_extrapolation = n_extrapolation
   )
   read_vc("hibernation/locations", root = raw_data) |>
     select(location_id = "id", "longitude", "latitude") |>
     st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
     st_transform(crs = 31370) -> locations
   select_imputation_total(
-    target = raw_data, species = species, start = as.Date(start),
-    n_present = 1, n_extrapolation = n_extrapolation
+    target = raw_data,
+    species = species,
+    start = as.Date(start),
+    n_present = 1,
+    n_extrapolation = n_extrapolation
   ) |>
     select(-"minimum", number = "total") |>
     mutate(sublocation_id = .data$location_id) |>
@@ -67,27 +83,35 @@ prepare_analysis_data_species <- function(
     filter(!is.na(.data$number)) |>
     group_by(.data$location_id, .data$winter) |>
     summarise(
-      total = sum(.data$number), .groups = "drop"
+      total = sum(.data$number),
+      .groups = "drop"
     ) |>
     write_vc(
-      file.path("hibernation", tolower(species), "too_short"), optimize = FALSE,
-      root = analysis_data, sorting = c("location_id", "winter"), stage = TRUE,
+      file.path("hibernation", tolower(species), "too_short"),
+      optimize = FALSE,
+      root = analysis_data,
+      sorting = c("location_id", "winter"),
+      stage = TRUE,
       strict = strict
     )
   file.path("hibernation", tolower(species), "too_short") |>
     update_metadata(
-      root = analysis_data, name = sprintf("too_short_%s", tolower(species)),
+      root = analysis_data,
+      name = sprintf("too_short_%s", tolower(species)),
       title = sprintf(
         "Locations with too few surveyed winters for %s",
         this_species$scientific_name[1]
       ),
-      description = sprintf("
+      description = sprintf(
+        "
 Available total number of observed invidiuals of %s per winter at locations
 where the number of surveyed winters is less than %i. The dataset starts at %s.
 Note that locations with multiple sublocations require raw data at the
 sublocation level. We can only use surveys containing only total numbers when
 the location consist of a single sublocation.",
-        this_species$scientific_name[1], n_winter, start
+        this_species$scientific_name[1],
+        n_winter,
+        start
       ),
       field_description = c(
         location_id = "The identifier of the location.",
@@ -104,22 +128,28 @@ the location consist of a single sublocation.",
     filter(.data$n > 1) |>
     select(-"n") -> duplicates
   write_vc(
-    duplicates, file.path("hibernation", tolower(species), "duplicates"),
-    optimize = FALSE, root = analysis_data,
-    sorting = c("sublocation_id", "winter"), stage = TRUE, strict = strict
+    duplicates,
+    file.path("hibernation", tolower(species), "duplicates"),
+    optimize = FALSE,
+    root = analysis_data,
+    sorting = c("sublocation_id", "winter"),
+    stage = TRUE,
+    strict = strict
   )
   file.path("hibernation", tolower(species), "duplicates") |>
     update_metadata(
       root = analysis_data,
       name = sprintf("duplicates_%s", tolower(species)),
       title = sprintf(
-  "Combinations of sublocations and winters with duplicate observations of %s",
+        "Combinations of sublocations and winters with duplicate observations of %s",
         this_species$scientific_name[1]
       ),
-      description = sprintf("
+      description = sprintf(
+        "
 Sublocation with duplicate observations for %s in a given per winter. The
 dataset starts at %s.",
-        this_species$scientific_name[1], start
+        this_species$scientific_name[1],
+        start
       ),
       field_description = c(
         sublocation_id = "The identifier of the sublocation.",
@@ -139,7 +169,8 @@ dataset starts at %s.",
     filter(.data$relevant > 0) |>
     mutate(
       sample_id = ifelse(
-        !is.na(.data$sample_id), .data$sample_id,
+        !is.na(.data$sample_id),
+        .data$sample_id,
         -.data$sublocation_id * 10000L - .data$winter
       ),
       across(c("location_id", "sublocation_id"), factor)
@@ -151,7 +182,10 @@ dataset starts at %s.",
     select("location_id", "sublocation_id", "winter", "sample_id", "number") |>
     write_vc(
       file.path("hibernation", tolower(species), "rare_sublocation"),
-      optimize = FALSE, root = analysis_data, stage = TRUE, strict = strict,
+      optimize = FALSE,
+      root = analysis_data,
+      stage = TRUE,
+      strict = strict,
       sorting = c("location_id", "sublocation_id", "winter")
     )
   file.path("hibernation", tolower(species), "rare_sublocation") |>
@@ -159,14 +193,17 @@ dataset starts at %s.",
       root = analysis_data,
       name = sprintf("rare_sublocation_%s", tolower(species)),
       title = sprintf(
-    "Time series with observations of %s at sublocations with too few winters",
+        "Time series with observations of %s at sublocations with too few winters",
         this_species$scientific_name[1]
       ),
-      description = sprintf("
+      description = sprintf(
+        "
 Time series of the number of observed invidiuals for %s per winter at
 sublocations where the number of observed winters is less than %i. The dataset
 starts at %s.",
-        this_species$scientific_name[1], n_present, start
+        this_species$scientific_name[1],
+        n_present,
+        start
       ),
       field_description = c(
         location_id = "The identifier of the location.",
@@ -184,7 +221,10 @@ starts at %s.",
     select("location_id", "sublocation_id", "winter", "sample_id", "number") |>
     write_vc(
       file.path("hibernation", tolower(species), "analysis_data"),
-      optimize = FALSE, root = analysis_data, stage = TRUE, strict = strict,
+      optimize = FALSE,
+      root = analysis_data,
+      stage = TRUE,
+      strict = strict,
       sorting = c("location_id", "sublocation_id", "winter")
     )
   file.path("hibernation", tolower(species), "analysis_data") |>
@@ -195,11 +235,15 @@ starts at %s.",
         "Time series with the relevant observations of %s per sublocation.",
         this_species$scientific_name[1]
       ),
-      description = sprintf("
+      description = sprintf(
+        "
 Time series of the number of observed invidiuals for %s per winter. Every
 sublocation has at least %i surveyed winter. The species is present during at
 least %i winters in every sublocation. The dataset starts at %s.",
-        this_species$scientific_name[1], n_winter, n_present, start
+        this_species$scientific_name[1],
+        n_winter,
+        n_present,
+        start
       ),
       field_description = c(
         location_id = "The identifier of the location.",
@@ -215,7 +259,10 @@ They are a combination of the sublocation_id and the winter.",
     distinct(.data$location_id, .data$X, .data$Y) |>
     write_vc(
       file.path("hibernation", tolower(species), "locations"),
-      optimize = FALSE, root = analysis_data, stage = TRUE, strict = strict,
+      optimize = FALSE,
+      root = analysis_data,
+      stage = TRUE,
+      strict = strict,
       sorting = c("location_id", "X", "Y")
     )
   file.path("hibernation", tolower(species), "locations") |>
@@ -226,12 +273,16 @@ They are a combination of the sublocation_id and the winter.",
         "Locations of the relevant observations of %s per winter.",
         this_species$scientific_name[1]
       ),
-      description = sprintf("
+      description = sprintf(
+        "
 The relevant locations for %s per winter. Every sublocation has at least %i
 surveyed winter. The species is present during at least %i winters in every
 sublocation. The dataset starts at %s. The coordinates are in the Belgian
 Lambert 72 coordinate system expressed as kilometers.",
-        this_species$scientific_name[1], n_winter, n_present, start
+        this_species$scientific_name[1],
+        n_winter,
+        n_present,
+        start
       ),
       field_description = c(
         location_id = "The identifier of the location.",
@@ -248,55 +299,98 @@ Lambert 72 coordinate system expressed as kilometers.",
 #' @importFrom git2rdata commit
 #' @export
 prepare_analysis_data <- function(
-  raw_data, analysis_data, start, n_winter = 4, n_present = 3, strict = TRUE
+  raw_data,
+  analysis_data,
+  start,
+  n_winter = 4,
+  n_present = 3,
+  strict = TRUE
 ) {
   prepare_analysis_data_species(
-    raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mbec",
+    raw_data = raw_data,
+    analysis_data = analysis_data,
+    start = start,
+    n_winter = n_winter,
+    n_present = n_present,
+    species = "Mbec",
     strict = strict
   )
   prepare_analysis_data_species(
-    raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mdas",
+    raw_data = raw_data,
+    analysis_data = analysis_data,
+    start = start,
+    n_winter = n_winter,
+    n_present = n_present,
+    species = "Mdas",
     strict = strict
   )
   prepare_analysis_data_species(
-    raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mdau",
+    raw_data = raw_data,
+    analysis_data = analysis_data,
+    start = start,
+    n_winter = n_winter,
+    n_present = n_present,
+    species = "Mdau",
     strict = strict
   )
   prepare_analysis_data_species(
-    raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mema",
+    raw_data = raw_data,
+    analysis_data = analysis_data,
+    start = start,
+    n_winter = n_winter,
+    n_present = n_present,
+    species = "Mema",
     strict = strict
   )
   prepare_analysis_data_species(
-    raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mmysbra",
+    raw_data = raw_data,
+    analysis_data = analysis_data,
+    start = start,
+    n_winter = n_winter,
+    n_present = n_present,
+    species = "Mmysbra",
     strict = strict
   )
   prepare_analysis_data_species(
-    raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mmyo",
+    raw_data = raw_data,
+    analysis_data = analysis_data,
+    start = start,
+    n_winter = n_winter,
+    n_present = n_present,
+    species = "Mmyo",
     strict = strict
   )
   prepare_analysis_data_species(
-    raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Mnat",
+    raw_data = raw_data,
+    analysis_data = analysis_data,
+    start = start,
+    n_winter = n_winter,
+    n_present = n_present,
+    species = "Mnat",
     strict = strict
   )
   prepare_analysis_data_species(
-    raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Pauraus",
+    raw_data = raw_data,
+    analysis_data = analysis_data,
+    start = start,
+    n_winter = n_winter,
+    n_present = n_present,
+    species = "Pauraus",
     strict = strict
   )
   prepare_analysis_data_species(
-    raw_data = raw_data, analysis_data = analysis_data, start = start,
-    n_winter = n_winter, n_present = n_present, species = "Pipspec",
+    raw_data = raw_data,
+    analysis_data = analysis_data,
+    start = start,
+    n_winter = n_winter,
+    n_present = n_present,
+    species = "Pipspec",
     strict = strict
   )
   commit(
-    message = "Automated commit from abvanalysis", repo = analysis_data,
-    session = TRUE, all = TRUE
+    message = "Automated commit from abvanalysis",
+    repo = analysis_data,
+    session = TRUE,
+    all = TRUE
   )
 }

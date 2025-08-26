@@ -26,22 +26,14 @@ WHERE
     dbGetQuery(conn = origin) -> raw_data
   raw_data |>
     distinct(.data$visit_id, .data$location_id, .data$date) -> raw_visit
-  raw_data |>
-    filter(.data$number > 1) |>
-    distinct(.data$visit_id, .data$location_id) |>
+  raw_visit |>
+    count(.data$location_id, .data$date) |>
+    filter(.data$n > 1) |>
+    inner_join(raw_visit, by = c("location_id", "date")) |>
     transmute(
-      .data$visit_id, .data$location_id,
-      problem = "number_min > 1 in individual based protocol"
-    ) |>
-    bind_rows(
-      raw_visit |>
-        count(.data$location_id, .data$date) |>
-        filter(.data$n > 1) |>
-        inner_join(raw_visit, by = c("location_id", "date")) |>
-        transmute(
-          .data$visit_id, .data$location_id,
-          problem = "duplicate visit in invididual based protocol"
-        )
+      .data$visit_id,
+      .data$location_id,
+      problem = "duplicate visit in invididual based protocol"
     ) -> problems
   raw_data |>
     filter(!.data$activity %in% ignore) -> raw_data
@@ -52,10 +44,13 @@ WHERE
     distinct(.data$sample_id, .data$visit_id, .data$sublocation_id) -> samples
   raw_data |>
     filter(!is.na(.data$species_id)) |>
-    count(.data$sample_id, .data$species_id, name = "number") -> observations
+    group_by(.data$sample_id, .data$species_id) |>
+    summarise(number = sum(.data$number), .groups = "drop") -> observations
   return(
     list(
-      visits = visits, samples = samples, observations = observations,
+      visits = visits,
+      samples = samples,
+      observations = observations,
       problems = problems
     )
   )
