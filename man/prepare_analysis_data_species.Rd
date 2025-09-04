@@ -24,8 +24,8 @@ prepare_analysis_data_species(
 
 \item{start}{The oldest date to use in the analysis}
 
-\item{n_present}{Minimum number of winters in which the species is observed at
-a location.
+\item{n_present}{Minimum number of winters in which the species is observed
+at a location.
 Remove locations with a number below this threshold.}
 
 \item{n_extrapolation}{Maximum number of winters to extrapolate the data.

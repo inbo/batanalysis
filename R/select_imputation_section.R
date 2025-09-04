@@ -5,8 +5,8 @@
 #' @inheritParams import_raw_data
 #' @param species the ID of the species
 #' @param start The oldest date to use in the analysis
-#' @param n_present Minimum number of winters in which the species is observed at
-#' a location.
+#' @param n_present Minimum number of winters in which the species is observed
+#' at a location.
 #' Remove locations with a number below this threshold.
 #' @param n_extrapolation Maximum number of winters to extrapolate the data.
 #' Only do imputations when the difference between the nearest observed winter

@@ -166,7 +166,7 @@ to_cluster |>
     location_ll |>
       filter(!is.na(.data$cluster), !.data$id %in% ignore_id)
   ) -> alt_cluster
- alt_cluster |>
+alt_cluster |>
   st_drop_geometry() |>
   inner_join(obs, by = c("id" = "location_id")) |>
   inner_join(relevant_species, by = c("species_id" = "id")) |>

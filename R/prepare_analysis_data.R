@@ -141,7 +141,10 @@ the location consist of a single sublocation.",
       root = analysis_data,
       name = sprintf("duplicates_%s", tolower(species)),
       title = sprintf(
-        "Combinations of sublocations and winters with duplicate observations of %s",
+        paste(
+          "Combinations of sublocations and winters with duplicate",
+          "observations of %s"
+        ),
         this_species$scientific_name[1]
       ),
       description = sprintf(
@@ -193,7 +196,10 @@ dataset starts at %s.",
       root = analysis_data,
       name = sprintf("rare_sublocation_%s", tolower(species)),
       title = sprintf(
-        "Time series with observations of %s at sublocations with too few winters",
+        paste(
+          "Time series with observations of %s at sublocations with too few",
+          "winters"
+        ),
         this_species$scientific_name[1]
       ),
       description = sprintf(

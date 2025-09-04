@@ -35,7 +35,10 @@ import_raw_data <- function(
     transmute(
       .data$visit_id,
       .data$location_id,
-      problem = "duplicate visits between individual and section based protocols"
+      problem = paste(
+        "duplicate visits between individual and section based",
+        "protocols"
+      )
     ) |>
     bind_rows(
       total$problem,
@@ -105,7 +108,10 @@ WHERE
       force = TRUE,
       root = target,
       name = "samples",
-      title = "Available visits at the sublocation level of the hibernating bat monitoring",
+      title = paste(
+        "Available visits at the sublocation level of the hibernating bat",
+        "monitoring"
+      ),
       field_description = c(
         visit_id = "Unique identifier of the visit",
         sample_id = "Unique identifier of the sample",
@@ -129,8 +135,10 @@ WHERE
       force = TRUE,
       root = target,
       name = "observations",
-      title = "Number of observed bats by species at the sublocation level of the hibernating
-bat monitoring",
+      title = paste(
+        "Number of observed bats by species at the sublocation level of the",
+        "hibernating bat monitoring"
+      ),
       field_description = c(
         species_id = "Unique identifier of the species",
         sample_id = "Unique identifier of the sample",
@@ -203,7 +211,10 @@ Only given when no observations at the sublocation level are available.",
       force = TRUE,
       root = target,
       name = "locations",
-      title = "Locations and sublocations observed during the hibernating bat monitoring",
+      title = paste(
+        "Locations and sublocations observed during the hibernating",
+        "bat monitoring"
+      ),
       field_description = c(
         id = "Unique identifier of the location or sublocation",
         name = "Name of the location or sublocation",
@@ -230,7 +241,10 @@ Only given when no observations at the sublocation level are available.",
       force = TRUE,
       root = target,
       name = "problems",
-      title = "Issues found during the import of the hibernating bat monitoring data",
+      title = paste(
+        "Issues found during the import of the hibernating bat",
+        "monitoring data"
+      ),
       field_description = c(
         visit_id = "Unique identifier of the visit",
         location_id = "Unique identifier of the location",

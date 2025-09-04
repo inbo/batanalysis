@@ -56,7 +56,7 @@ prepare_analysis_model_species <- function(
   # model for presence of the species
   dataset |>
     mutate(present = as.integer(.data$number > 0)) |>
-    select(-"number", -'sample_id') |>
+    select(-"number", -"sample_id") |>
     as.data.frame() -> data
   data |>
     filter(!is.na(.data$present)) |>
@@ -212,7 +212,10 @@ number ~ 0 + intercept +
       qsublocation, qsubwinter, model = \"iid\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
     )",
-    model_type = "inla zeroinflatednbinomial0: SPDE + Winter * (1 + Location + SubLocation)",
+    model_type = paste(
+      "inla zeroinflatednbinomial0:",
+      "SPDE + Winter * (1 + Location + SubLocation)"
+    ),
     data = data,
     result_datasource_id = "git",
     scheme_id = "hibernating bats",

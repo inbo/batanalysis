@@ -138,17 +138,27 @@ extract_results.n2kModelImputed <- function(x, root, ...) {
     file = "hibernation/total_rw1",
     root = root,
     name = "hibernation_total_rw1",
-    title = "Total number of hibernating bats modeled with a first order random walk",
-    description = "Model based on the total number of hibernating bats in the winter season.
-Missing values are imputed before calculating the total. The model is a first
-order random walk on the winter season with a negative binomial distribution.",
+    title = paste(
+      "Total number of hibernating bats modeled with a first order random walk"
+    ),
+    description = paste(
+      "Model based on the total number of hibernating bats in the winter",
+      "season.",
+      "Missing values are imputed before calculating the total.",
+      "The model is a first order random walk on the winter season with a",
+      "negative binomial distribution."
+    ),
     field_description = c(
       species = "The code of the species group",
-      model_type = "A short description of the model used to analyse the totals",
+      model_type = paste(
+        "A short description of the model used to analyse the totals"
+      ),
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
       winter = "The winter season defined by the year in which January falls",
-      estimate = "The estimated total number of hibernating bats on the log-scale",
+      estimate = paste(
+        "The estimated total number of hibernating bats on the log-scale"
+      ),
       se = "The standard error of the estimate, also on the log-scale"
     )
   )
@@ -180,19 +190,33 @@ order random walk on the winter season with a negative binomial distribution.",
     file = "hibernation/index",
     root = root,
     name = "hibernation_index",
-    title = "Relative change in total number of hibernating bats between two winters",
-    description = "Model based on the total number of hibernating bats in the winter season.
-Missing values are imputed before calculating the total. The model is a first
-order random walk on the winter season with a negative binomial distribution.",
+    title = paste(
+      "Relative change in total number of hibernating bats between two winters"
+    ),
+    description = paste(
+      "Model based on the total number of hibernating bats in the winter",
+      "season.",
+      "Missing values are imputed before calculating the total.",
+      "The model is a first order random walk on the winter season with a",
+      "negative binomial distribution."
+    ),
     field_description = c(
       species = "The code of the species group",
-      model_type = "A short description of the model used to analyse the totals",
+      model_type = paste(
+        "A short description of the model used to analyse the totals"
+      ),
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
-      reference = "The reference winter season defined by the year in which January falls",
-      target = "The target winter season defined by the year in which January falls",
-      estimate = "The log-ratio of the total number of hibernating bats in the target winter
-divided by those in the reference winter",
+      reference = paste(
+        "The reference winter season defined by the year in which January falls"
+      ),
+      target = paste(
+        "The target winter season defined by the year in which January falls"
+      ),
+      estimate = paste(
+        "The log-ratio of the total number of hibernating bats in the target",
+        "winter divided by those in the reference winter."
+      ),
       se = "The standard error of the estimate, also on the log-scale"
     )
   )
@@ -233,16 +257,24 @@ divided by those in the reference winter",
     root = root,
     name = "hibernation_trend",
     title = "Linear trend in total number of hibernating bats",
-    description = "Model based on the total number of hibernating bats in the winter season.
-Missing values are imputed before calculating the total. The model is a first
-order random walk on the winter season with a negative binomial distribution.",
+    description = paste(
+      "Model based on the total number of hibernating bats in the winter",
+      "season.",
+      "Missing values are imputed before calculating the total.",
+      "The model is a first order random walk on the winter season with a",
+      "negative binomial distribution."
+    ),
     field_description = c(
       species = "The code of the species group",
-      model_type = "A short description of the model used to analyse the totals",
+      model_type = paste(
+        "A short description of the model used to analyse the totals"
+      ),
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
-      midpoint = "Central winter of the period over which the trend was calculated. The winter
-season defined by the year in which January falls",
+      midpoint = paste(
+        "Central winter of the period over which the trend was calculated.",
+        "The winter season defined by the year in which January falls"
+      ),
       duration = "Number of winters over which the trend was calculated",
       estimate = "The average change per winter on the log-scale",
       se = "The standard error of the estimate, also on the log-scale"
@@ -285,16 +317,24 @@ season defined by the year in which January falls",
     root = root,
     name = "hibernation_average",
     title = "The average of total number of hibernating bats over a period",
-    description = "Model based on the total number of hibernating bats in the winter season.
-Missing values are imputed before calculating the total. The model is a first
-order random walk on the winter season with a negative binomial distribution.",
+    description = paste(
+      "Model based on the total number of hibernating bats in the winter",
+      "season.",
+      "Missing values are imputed before calculating the total.",
+      "The model is a first order random walk on the winter season with a",
+      "negative binomial distribution."
+    ),
     field_description = c(
       species = "The code of the species group",
-      model_type = "A short description of the model used to analyse the totals",
+      model_type = paste(
+        "A short description of the model used to analyse the totals"
+      ),
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
-      midpoint = "Central winter of the period over which the average was calculated. The winter
-season defined by the year in which January falls",
+      midpoint = paste(
+        "Central winter of the period over which the average was calculated.",
+        "The winter season defined by the year in which January falls"
+      ),
       duration = "Number of winters over which the average was calculated",
       estimate = "The average on the log-scale",
       se = "The standard error of the estimate, also on the log-scale"
@@ -346,23 +386,37 @@ season defined by the year in which January falls",
     file = "hibernation/difference",
     root = root,
     name = "hibernation_difference",
-    title = "Difference in average number of total number of hibernating bats of two
-periods.",
-    description = "Model based on the total number of hibernating bats in the winter season.
-Missing values are imputed before calculating the total. The model is a first
-order random walk on the winter season with a negative binomial distribution.",
+    title = paste(
+      "Difference in average number of total number of hibernating bats of",
+      "two periods."
+    ),
+    description = paste(
+      "Model based on the total number of hibernating bats in the winter",
+      "season.",
+      "Missing values are imputed before calculating the total.",
+      "The model is a first order random walk on the winter season with a",
+      "negative binomial distribution."
+    ),
     field_description = c(
       species = "The code of the species group",
-      model_type = "A short description of the model used to analyse the totals",
+      model_type = paste(
+        "A short description of the model used to analyse the totals"
+      ),
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
-      reference = "The midpoint of reference winter season. The winter season defined by the year
-in which January falls",
-      target = "The midpoint of target winter season. The winter season defined by the year
-in which January falls",
+      reference = paste(
+        "The midpoint of reference winter season.",
+        "The winter season defined by the year in which January falls"
+      ),
+      target = paste(
+        "The midpoint of target winter season.",
+        "The winter season defined by the year in which January falls"
+      ),
       duration = "Number of winters over which the averages were calculated",
-      estimate = "The log-rate of the average of the target period divided by the reference
-period",
+      estimate = paste(
+        "The log-rate of the average of the target period divided by the",
+        "reference period"
+      ),
       se = "The standard error of the estimate, also on the log-scale"
     )
   )
@@ -439,24 +493,42 @@ extract_results.n2kAggregate <- function(x, root, ...) {
       root = root,
       name = "hibernation_total_location",
       title = "The imputed total number of hibernating bats per location",
-      description = "The imputed total number of hibernating bats in the winter season per locaion.
-Missing values are imputed before calculating the total. The model is a first
-order random walk on the winter season with a negative binomial distribution.",
+      description = paste(
+        "The imputed total number of hibernating bats in the winter season per",
+        "location.",
+        "Missing values are imputed before calculating the total.",
+        "The model is a first order random walk on the winter season with a",
+        "negative binomial distribution."
+      ),
       field_description = c(
         species = "The code of the species group",
-        model_type = "A short description of the model used to calculate the totals",
+        model_type = paste(
+          "A short description of the model used to calculate the totals"
+        ),
         analysis = "The file fingerprint of the analysis",
         fingerprint = "The status fingerprint of the analysis",
         winter = "The winter season defined by the year in which January falls",
         mean = "The average of the imputed total number of hibernating bats",
         min = "The minimum of the imputed total number of hibernating bats",
         p05 = "The 5% quantile of the imputed total number of hibernating bats",
-        p20 = "The 20% quantile of the imputed total number of hibernating bats",
-        p35 = "The 35% quantile of the imputed total number of hibernating bats",
-        p50 = "The 50% quantile of the imputed total number of hibernating bats",
-        p65 = "The 65% quantile of the imputed total number of hibernating bats",
-        p80 = "The 80% quantile of the imputed total number of hibernating bats",
-        p95 = "The 95% quantile of the imputed total number of hibernating bats",
+        p20 = paste(
+          "The 20% quantile of the imputed total number of hibernating bats"
+        ),
+        p35 = paste(
+          "The 35% quantile of the imputed total number of hibernating bats"
+        ),
+        p50 = paste(
+          "The 50% quantile of the imputed total number of hibernating bats"
+        ),
+        p65 = paste(
+          "The 65% quantile of the imputed total number of hibernating bats"
+        ),
+        p80 = paste(
+          "The 80% quantile of the imputed total number of hibernating bats"
+        ),
+        p95 = paste(
+          "The 95% quantile of the imputed total number of hibernating bats"
+        ),
         max = "The maximum of the imputed total number of hibernating bats"
       )
     )
@@ -496,24 +568,41 @@ order random walk on the winter season with a negative binomial distribution.",
       root = root,
       name = "hibernation_total",
       title = "The imputed total number of hibernating bats",
-      description = "The imputed total number of hibernating bats in the winter season.
-Missing values are imputed before calculating the total. The model is a first
-order random walk on the winter season with a negative binomial distribution.",
+      description = paste(
+        "The imputed total number of hibernating bats in the winter season.",
+        "Missing values are imputed before calculating the total.",
+        "The model is a first order random walk on the winter season with a",
+        "negative binomial distribution."
+      ),
       field_description = c(
         species = "The code of the species group",
-        model_type = "A short description of the model used to calculate the totals",
+        model_type = paste(
+          "A short description of the model used to calculate the totals"
+        ),
         analysis = "The file fingerprint of the analysis",
         fingerprint = "The status fingerprint of the analysis",
         winter = "The winter season defined by the year in which January falls",
         mean = "The average of the imputed total number of hibernating bats",
         min = "The minimum of the imputed total number of hibernating bats",
         p05 = "The 5% quantile of the imputed total number of hibernating bats",
-        p20 = "The 20% quantile of the imputed total number of hibernating bats",
-        p35 = "The 35% quantile of the imputed total number of hibernating bats",
-        p50 = "The 50% quantile of the imputed total number of hibernating bats",
-        p65 = "The 65% quantile of the imputed total number of hibernating bats",
-        p80 = "The 80% quantile of the imputed total number of hibernating bats",
-        p95 = "The 95% quantile of the imputed total number of hibernating bats",
+        p20 = paste(
+          "The 20% quantile of the imputed total number of hibernating bats"
+        ),
+        p35 = paste(
+          "The 35% quantile of the imputed total number of hibernating bats"
+        ),
+        p50 = paste(
+          "The 50% quantile of the imputed total number of hibernating bats"
+        ),
+        p65 = paste(
+          "The 65% quantile of the imputed total number of hibernating bats"
+        ),
+        p80 = paste(
+          "The 80% quantile of the imputed total number of hibernating bats"
+        ),
+        p95 = paste(
+          "The 95% quantile of the imputed total number of hibernating bats"
+        ),
         max = "The maximum of the imputed total number of hibernating bats"
       )
     )

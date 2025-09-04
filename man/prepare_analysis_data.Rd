@@ -20,8 +20,8 @@ prepare_analysis_data(
 
 \item{start}{The oldest date to use in the analysis}
 
-\item{n_present}{Minimum number of winters in which the species is observed at
-a location.
+\item{n_present}{Minimum number of winters in which the species is observed
+at a location.
 Remove locations with a number below this threshold.}
 
 \item{strict}{What to do when the metadata changes. \code{strict = FALSE}

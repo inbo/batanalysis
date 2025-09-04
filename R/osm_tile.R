@@ -43,7 +43,10 @@ osm_tile <- function(
     max(0) -> zoom
   target_url <- c(
     osm = "https://a.tile.openstreetmap.org/%.0f/%.0f/%.0f.png",
-    water = "https://tiles.stadiamaps.com/tiles/watercolor/%.0f/%.0f/%.0f@2x.png"
+    water = paste0(
+      "https://tiles.stadiamaps.com/tiles/watercolor/%.0f/%.0f/",
+      "%.0f@2x.png"
+    )
   )
   expand.grid(
     lon = seq(bbox["xmin"], bbox["xmax"], 360 * 2^-zoom),
