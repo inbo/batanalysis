@@ -11,7 +11,8 @@ get_child_species <- function(target, species) {
     is.string(species),
     noNA(species)
   )
-  read_vc("hibernation/species", root = target) |>
+  file.path("data", "hibernation", "species") |>
+    verify_vc(root = target, c("code", "id", "parent")) |>
     select("code", "id", "parent") -> species_list
   species_list |>
     filter(.data$code == species) -> relevant_species

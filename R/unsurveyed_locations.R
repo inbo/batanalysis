@@ -8,7 +8,7 @@
 #' @importFrom rlang .data
 #' @export
 unsurveyed_sublocations <- function(
-  data_repo = keyring::key_get("meetnetten", "batanalysis_data")
+  data_repo = "."
 ) {
   file.path("data", "hibernation", "locations") |>
     verify_vc(

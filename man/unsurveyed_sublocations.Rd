@@ -4,9 +4,7 @@
 \alias{unsurveyed_sublocations}
 \title{Count the unsurveyed sublocations per location}
 \usage{
-unsurveyed_sublocations(
-  data_repo = keyring::key_get("meetnetten", "batanalysis_data")
-)
+unsurveyed_sublocations(data_repo = ".")
 }
 \arguments{
 \item{data_repo}{Character; path to the root of the data repository}
