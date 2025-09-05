@@ -1,0 +1,29 @@
+project:
+  type: book
+  preview:
+    browser: false
+  output-dir: output
+
+execute:
+  echo: false
+  message: false
+  freeze: false
+  warning: false
+
+lang: nl-BE
+
+format:
+  flandersqmd-leaflet-pdf:
+    fig-height: 2
+book:
+  chapters:
+    - index.md
+    - toestand.qmd
+    - beschikbaar.qmd
+    - resultaten.qmd
+    - locatie.qmd
+
+flandersqmd:
+  entity: INBO
+  level: 2
+  floatbarrier: section

@@ -1,0 +1,751 @@
+---
+params:
+  data: "data"
+  result: "result"
+  location: 20352
+  name: Fort Lier (3010)
+  n_winter: 24
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(batanalysis)
+library(git2rdata)
+library(INBOtheme)
+library(rlang)
+library(scales)
+library(tidyverse)
+conflicted::conflicts_prefer(dplyr::filter, dplyr::lag, dplyr::pull)
+theme_set(theme_inbo(base_size = 9, transparent = TRUE))
+data_root <- repository(params$data)
+result_root <- repository(params$result)
+```
+
+```{r functions}
+get_relevant_raw_count <- function(relevant_visits, data_root) {
+  relevant_visits |>
+    select(
+      "visit_id", "surveyed_sublocations", "date", "relevant"
+    ) -> this_relevant
+  stopifnot(nrow(this_relevant) > 0)
+  if (all(is.na(this_relevant$surveyed_sublocations))) {
+    file.path("data", "hibernation", "totals") |>
+      verify_vc(
+        root = data_root, variables = c("visit_id", "species_id", "total")
+      ) |>
+      inner_join(this_relevant, by = "visit_id") |>
+      complete(
+        nesting(!!sym("visit_id"), !!sym("date"), !!sym("relevant")),
+        .data$species_id,
+        fill = list(total = 0)
+      ) |>
+      select(-"surveyed_sublocations") |>
+      mutate(
+        winter = round_date(.data$date, "year") |>
+          year()
+      ) -> totals
+    return(totals)
+  }
+  file.path("data", "hibernation", "samples") |>
+    verify_vc(
+      root = data_root, variables = c("visit_id", "sample_id", "sublocation_id")
+    ) |>
+    inner_join(this_relevant, by = "visit_id") |>
+    left_join(
+      file.path("data", "hibernation", "aggregation") |>
+        verify_vc(
+          root = data_root, variables = c("sublocation_id", "aggregate")
+        ),
+      by = "sublocation_id"
+    ) |>
+    mutate(
+      sublocation_id = ifelse(
+        is.na(.data$aggregate), .data$sublocation_id, .data$aggregate
+      )
+    ) |>
+    inner_join(
+      file.path("data", "hibernation", "observations") |>
+        verify_vc(
+          root = data_root, variables = c("sample_id", "species_id", "number")
+        ),
+      by = "sample_id"
+    ) |>
+    group_by(.data$visit_id, .data$species_id) |>
+    summarise(total = sum(.data$number), .groups = "drop") |>
+    bind_rows(
+      file.path("data", "hibernation", "totals") |>
+        verify_vc(
+          root = data_root, variables = c("visit_id", "species_id", "total")
+        )
+    ) |>
+    complete(.data$visit_id, .data$species_id, fill = list(total = 0)) |>
+    left_join(x = this_relevant, by = "visit_id") |>
+    select(-"surveyed_sublocations") |>
+    mutate(
+      winter = round_date(.data$date, "year") |>
+        year()
+    )
+}
+display_intro <- function(this_species, species) {
+  list.files("intro", pattern = this_species, full.names = TRUE) |>
+    readLines() |>
+    cat(sep = "\n")
+  species$name[species$species == this_species]
+}
+display_totals <- function(timeseries, this_species, raw_data) {
+  timeseries |>
+    filter(.data$species == this_species) -> this_totals
+  raw_data |>
+    mutate(
+      winter = round_date(.data$date, "year") |>
+        year()
+    ) |>
+    left_join(
+      this_totals |>
+        transmute(.data$winter, .data$p50, relevant = TRUE),
+      by = c("winter", "relevant")
+    ) |>
+    mutate(relevant = !is.na(.data$p50)) -> raw_data
+  p <- ggplot(this_totals, aes(x = date, y = mean)) +
+    geom_ribbon(aes(ymin = .data$p05, ymax = .data$p95), alpha = 0.25) +
+    geom_ribbon(aes(ymin = .data$p20, ymax = .data$p80), alpha = 0.33) +
+    geom_ribbon(aes(ymin = .data$p35, ymax = .data$p65), alpha = 0.5) +
+    geom_line() +
+    geom_point(data = raw_data, aes(y = .data$total, colour = .data$relevant)) +
+    scale_colour_discrete(
+      name = "in analyse", breaks = c(TRUE, FALSE), labels = c("ja", "nee")
+    ) +
+    theme(axis.title = element_blank())
+  c(this_totals$total, raw_data$total) |>
+    max() -> m_tot
+  if (m_tot < 6) {
+    p <- p +
+      scale_y_continuous(
+        limits = c(0, m_tot + 1), breaks = seq_len(m_tot + 2) - 1
+      )
+  } else {
+    p <- p +
+      scale_y_continuous(limits = c(0, NA))
+  }
+  print(p)
+  return(this_totals)
+}
+display_flanders <- function(flanders, this_species) {
+  flanders |>
+    filter(.data$species == this_species) -> this_flanders
+  p <- ggplot(this_flanders, aes(x = .data$winter)) +
+    geom_ribbon(aes(ymin = .data$p05, ymax = .data$p95), alpha = 0.25) +
+    geom_ribbon(aes(ymin = .data$p20, ymax = .data$p80), alpha = 0.33) +
+    geom_ribbon(aes(ymin = .data$p35, ymax = .data$p65), alpha = 0.5) +
+    geom_line(aes(y = mean)) +
+    scale_x_continuous(n.breaks = 12) +
+    scale_y_continuous(limits = c(0, NA)) +
+    theme(axis.title = element_blank())
+  print(p)
+  return(this_flanders)
+}
+display_ratio <- function(this_flanders, this_totals) {
+  p <- this_flanders |>
+    select("winter", flanders = "mean") |>
+    inner_join(this_totals, by = "winter") |>
+    mutate(
+      across(c("mean", matches("p[0-9]")), ~ .x / .data$flanders)
+    ) |>
+    ggplot(aes(x = .data$winter)) +
+    geom_ribbon(aes(ymin = .data$p05, ymax = .data$p95), alpha = 0.25) +
+    geom_ribbon(aes(ymin = .data$p20, ymax = .data$p80), alpha = 0.33) +
+    geom_ribbon(aes(ymin = .data$p35, ymax = .data$p65), alpha = 0.5) +
+    geom_line(aes(y = mean)) +
+    scale_x_continuous(n.breaks = 12) +
+    scale_y_continuous(limits = c(0, NA), labels = percent) +
+    theme(axis.title = element_blank())
+  print(p)
+}
+```
+
+```{r}
+#| label: read-data
+relevant <- read_vc("relevant_visit")
+max_date <- max(relevant$date)
+round_date(max_date, "year") |>
+  year() -> current_winter
+relevant |>
+  filter(.data$location_id == params$location) |>
+  mutate(
+    analyse = ifelse(.data$relevant, "ja", "nee"),
+    onderzocht = (.data$surveyed_sublocations / .data$n_sublocations) |>
+      cut(
+        breaks = c(0, 0.25, 0.5, 0.75, 1, Inf), right = FALSE,
+        labels = c("0-25%", "25-50%", "50-75%", "75-100%", "100%")
+      ) |>
+      as.character() |>
+      replace_na("enkel\ntotaal") |>
+      factor(
+        levels = c(
+          "100%", "75-100%", "50-75%", "0-25%", "25-50%", "enkel\ntotaal"
+        )
+      )
+  ) -> relevant_visits
+raw_count <- get_relevant_raw_count(relevant_visits, data_root)
+file.path("data", "hibernation", "species") |>
+  verify_vc(
+    root = data_root, variables = c("id", "code", "name", "scientific_name")
+  ) |>
+  transmute(
+    species = tolower(.data$code), .data$id, .data$name,
+    .data$scientific_name
+  ) -> species
+file.path("hibernation", "total") |>
+  verify_vc(root = result_root, variables = c("species", "winter", "mean")) |>
+  inner_join(species, by = "species") -> flanders
+file.path("hibernation", "total_location") |>
+  verify_vc(root = result_root, variables = c("location", "species")) -> totals
+totals |>
+  filter(.data$location == params$location) |>
+  mutate(
+    date = paste0(.data$winter, "-01-15") |>
+      as.Date(format = "%Y-%m-%d")
+  ) |>
+  inner_join(species, by = "species") -> timeseries
+```
+
+```{r}
+#| label: cap-format
+object_cap <- "Tijdreeks van %s in %s.
+Zie de uitleg in @sec-uitleg."
+flanders_cap <- "Tijdreeks van %s in Vlaanderen.
+Zie de uitleg in @sec-uitleg."
+fraction_cap <- "Tijdreeks van %s in %s uitgedrukt als een percentage
+van de Vlaamse populatie.
+Zie de uitleg in @sec-uitleg."
+```
+
+# Resultaten per soort
+
+## Beknopte uitleg over de figuren {#sec-uitleg}
+
+We geven enkel resultaten voor de soorten we aantroffen in `r params$name`.
+Per soort tonen we een, twee of drie figuren.
+
+### Soorten met een figuur
+
+We tonen slechts een figuur voor soorten die te zeldzaam zijn voor een betrouwbare trendanalyse op het niveau van Vlaanderen of voor de gevallen waarbij we de vleermuizen niet tot op naam konden brengen.
+Deze figuur toont de waargenomen aantallen van de soort in `r params$name` over de tijd.
+
+### Soorten met twee figuren
+
+Wanneer we een tweede figuur tonen, dan hebben we in Vlaanderen voldoende gegevens om een betrouwbare trendanalyse uit te voeren.
+Binnen deze winterverblijfplaats is de soort echter te sporadisch aanwezig.
+Deze tweede figuur toont de evolutie van de totale populatie van de soort in Vlaanderen.
+Deze figuur bevat een lijn en drie gekleurde banden.
+De lijn geeft de geschatte totale populatie weer na bijschatting van de niet-getelde (delen van) objecten.
+De gekleurde banden geven de onzekerheid rond de geschatte totalen weer.
+De donkerste band geeft het 30%-geloofwaardigheidsinterval weer, de middelste band het 60%-geloofwaardigheidsinterval en de lichtste band het 90%-geloofwaardigheidsinterval.
+
+### Soorten met drie figuren
+
+Wanneer we drie figuren tonen, dan is de soort voldoende aanwezig binnen deze winterverblijfplaats om ze in gebruiken bij de analyse op het niveau van Vlaanderen.
+We vullen de eerste figuur nu aan met een lijn en drie gekleurde banden.
+Deze hebben dezelfde betekenis als in de tweede figuur, behalve dat ze nu enkel slaan op deze winterverblijfplaats.
+Wanneer zowel de lijn als de banden zichtbaar zijn, hebben we voor de betrokken winter geen (volledige) telling.
+En dan hebben een bijschatting gemaakt voor de delen die niet onderzocht zijn.
+Deze aantallen zullen bijgevolg nooit lager zijn dan de waargenomen aantallen.
+In het geval van een volledige telling, doen we geen bijschattingen.
+Dan zullen de lijn en de banden samenvallen met de punten.
+
+De derde figuur toont de verhouding van de aantallen in deze winterverblijfplaats in verhouding met de totale aantallen in Vlaanderen.
+De lijn geeft de gemiddelde schatting van de verhouding weer.
+De gekleurde banden geven de onzekerheid rond de geschatte verhouding weer.
+
+```{r species-data}
+selected_species <- get_child_species(data_root, "Mmysbra")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_mmysbra
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Mdau")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_mdau
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Mnat")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_mnat
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Mema")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_mema
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Mdas")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_mdas
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Mbec")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_mbec
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Mmyo")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_mmyo
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Pipspec")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_pipspec
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Pauraus")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_pauraus
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Eser")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_eser
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Bbar")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_bbar
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Rhip")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_rhip
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Rfer")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_rfer
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+selected_species <- get_child_species(data_root, "Nspec")
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_nspec
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+species |>
+  filter(.data$species == "mspec") -> selected_species
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_mspec
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+species |>
+  filter(.data$species == "cspec") -> selected_species
+selected_species |>
+  inner_join(x = raw_count, by = c("species_id" = "id")) |>
+  group_by(.data$visit_id, .data$date, .data$relevant) |>
+  summarise(total = sum(.data$total), .groups = "drop") |>
+  arrange(.data$relevant, .data$date) -> raw_cspec
+raw_count |>
+  anti_join(selected_species, by = c("species_id" = "id")) -> raw_count
+species |>
+  semi_join(raw_count, by = c("id" = "species_id")) -> missing_species
+```
+
+```{r}
+#| label: missing-species
+#| eval: !expr 'nrow(missing_species) > 0'
+missing_species
+```
+
+```{r}
+#| eval: !expr 'any(raw_mmysbra$total > 0)'
+#| label: intro-mmysbra
+#| results: asis
+this_species <- "mmysbra"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mmysbra$total > 0)'
+#| label: fig-mmysbra-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_mmysbra)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mmysbra$total > 0)'
+#| label: fig-mmystbra-global
+#| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
+this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mmysbra$total > 0) && nrow(this_totals) > 0'
+#| label: fig-mmystbra-fraction
+#| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
+display_ratio(this_flanders, this_totals)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mdau$total > 0)'
+#| label: intro-mdau
+#| results: asis
+this_species <- "mdau"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mdau$total > 0)'
+#| label: fig-mdau-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_mdau)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mdau$total > 0)'
+#| label: fig-mdau-global
+#| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
+this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mdau$total > 0) && nrow(this_totals) > 0'
+#| label: fig-mdau-fraction
+#| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
+display_ratio(this_flanders, this_totals)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mema$total > 0)'
+#| label: intro-mema
+#| results: asis
+this_species <- "mema"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mema$total > 0)'
+#| label: fig-mema-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_mema)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mema$total > 0)'
+#| label: fig-mema-global
+#| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
+this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mema$total > 0) && nrow(this_totals) > 0'
+#| label: fig-mema-fraction
+#| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
+display_ratio(this_flanders, this_totals)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mnat$total > 0)'
+#| label: intro-mnat
+#| results: asis
+this_species <- "mnat"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mnat$total > 0)'
+#| label: fig-mnat-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_mnat)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mnat$total > 0)'
+#| label: fig-mnat-global
+#| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
+this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mnat$total > 0) && nrow(this_totals) > 0'
+#| label: fig-mnat-fraction
+#| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
+display_ratio(this_flanders, this_totals)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mdas$total > 0)'
+#| label: intro-mdas
+#| results: asis
+this_species <- "mdas"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mdas$total > 0)'
+#| label: fig-mdas-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_mdas)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mdas$total > 0)'
+#| label: fig-mdas-global
+#| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
+this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mdas$total > 0) && nrow(this_totals) > 0'
+#| label: fig-mdas-fraction
+#| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
+display_ratio(this_flanders, this_totals)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mbec$total > 0)'
+#| label: intro-mbec
+#| results: asis
+this_species <- "mbec"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mbec$total > 0)'
+#| label: fig-mbec-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_mbec)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mbec$total > 0)'
+#| label: fig-mbec-global
+#| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
+this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mbec$total > 0) && nrow(this_totals) > 0'
+#| label: fig-mbec-fraction
+#| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
+display_ratio(this_flanders, this_totals)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mmyo$total > 0)'
+#| label: intro-mmyo
+#| results: asis
+this_species <- "mmyo"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mmyo$total > 0)'
+#| label: fig-mmyo-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_mmyo)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mmyo$total > 0)'
+#| label: fig-mmyo-global
+#| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
+this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mmyo$total > 0) && nrow(this_totals) > 0'
+#| label: fig-mmyo-fraction
+#| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
+display_ratio(this_flanders, this_totals)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mspec$total > 0)'
+#| label: intro-mspec
+#| results: asis
+this_species <- "mspec"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mspec$total > 0)'
+#| label: fig-mspec-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_mspec)
+```
+
+```{r}
+#| eval: !expr 'any(raw_pipspec$total > 0)'
+#| label: intro-pipspec
+#| results: asis
+this_species <- "pipspec"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_pipspec$total > 0)'
+#| label: fig-pipspec-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_pipspec)
+```
+
+```{r}
+#| eval: !expr 'any(raw_pipspec$total > 0)'
+#| label: fig-pipspec-global
+#| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
+this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_pipspec$total > 0) && nrow(this_totals) > 0'
+#| label: fig-pipspec-fraction
+#| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
+display_ratio(this_flanders, this_totals)
+```
+
+```{r}
+#| eval: !expr 'any(raw_pauraus$total > 0)'
+#| label: intro-pauraus
+#| results: asis
+this_species <- "pauraus"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_pauraus$total > 0)'
+#| label: fig-pauraus-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_pauraus)
+```
+
+```{r}
+#| eval: !expr 'any(raw_pauraus$total > 0)'
+#| label: fig-pauraus-global
+#| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
+this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_pauraus$total > 0) && nrow(this_totals) > 0'
+#| label: fig-pauraus-fraction
+#| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
+display_ratio(this_flanders, this_totals)
+```
+
+```{r}
+#| eval: !expr 'any(raw_eser$total > 0)'
+#| label: intro-eser
+#| results: asis
+this_species <- "eser"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_eser$total > 0)'
+#| label: fig-eser-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_eser)
+```
+
+```{r}
+#| eval: !expr 'any(raw_rhip$total > 0)'
+#| label: intro-rhip
+#| results: asis
+this_species <- "rhip"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_rhip$total > 0)'
+#| label: fig-rhip-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_rhip)
+```
+
+```{r}
+#| eval: !expr 'any(raw_rfer$total > 0)'
+#| label: intro-rfer
+#| results: asis
+this_species <- "rfer"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_rfer$total > 0)'
+#| label: fig-rfer-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_rfer)
+```
+
+```{r}
+#| eval: !expr 'any(raw_bbar$total > 0)'
+#| label: intro-bbar
+#| results: asis
+this_species <- "bbar"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_bbar$total > 0)'
+#| label: fig-bbar-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_bbar)
+```
+
+```{r}
+#| eval: !expr 'any(raw_cspec$total > 0)'
+#| label: intro-cspec
+#| results: asis
+this_species <- "cspec"
+this_name <- display_intro(this_species, species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_cspec$total > 0)'
+#| label: fig-cspec-local
+#| fig-cap: !expr 'sprintf(object_cap, this_name, params$name)'
+this_totals <- display_totals(timeseries, this_species, raw_cspec)
+```

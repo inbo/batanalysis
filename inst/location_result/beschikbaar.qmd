@@ -1,0 +1,161 @@
+---
+params:
+  data: "data"
+  result: "result"
+  location: 20352
+  name: Fort Lier (3010)
+  n_winter: 24
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(git2rdata)
+library(INBOtheme)
+library(tidyverse)
+conflicted::conflicts_prefer(dplyr::filter, dplyr::lag, dplyr::pull)
+theme_set(theme_inbo(base_size = 9, transparent = TRUE))
+```
+
+```{r}
+#| label: read-data
+relevant <- read_vc("relevant_visit")
+max_date <- max(relevant$date)
+round_date(max_date, "year") |>
+  year() -> current_winter
+relevant |>
+  filter(.data$location_id == params$location) |>
+  mutate(
+    analyse = ifelse(relevant, "ja", "nee"),
+    onderzocht = (.data$surveyed_sublocations / .data$n_sublocations) |>
+      cut(
+        breaks = c(0, 0.25, 0.5, 0.75, 1, Inf), right = FALSE,
+        labels = c("0-25%", "25-50%", "50-75%", "75-100%", "100%")
+      ) |>
+      as.character() |>
+      replace_na("enkel\ntotaal") |>
+      factor(
+        levels = c(
+          "100%", "75-100%", "50-75%", "0-25%", "25-50%", "enkel\ntotaal"
+        )
+      )
+  ) -> relevant_visits
+relevant |>
+  filter(current_winter - .data$winter <= params$n_winter) |>
+  mutate(
+    score = ifelse(
+      max(.data$n_sublocations) > 1 & !is.na(.data$surveyed_sublocations),
+      0.5, 1
+    ) /
+      (current_winter - .data$winter + 1)
+  ) |>
+  group_by(.data$location_id, .data$winter) |>
+  summarise(score = max(.data$score), .groups = "drop_last") |>
+  summarise(score = sum(.data$score)) |>
+  mutate(
+    score = 100 * .data$score / sum(1 / seq_len(params$n_winter))
+  ) -> scores
+scores |>
+  count(.data$score) |>
+  arrange(desc(.data$score)) |>
+  transmute(
+    .data$score,
+    rang = lag(.data$n, 1, default = 1) |>
+      cumsum(),
+    rang = sprintf("%.1f%%", 100 * .data$rang / nrow(scores)),
+    niveau = case_when(
+      .data$score >=
+        sum(1 / seq_len(0.75 * params$n_winter)) /
+          sum(1 / seq_len(params$n_winter)) ~
+        " (goud)",
+      .data$score >=
+        sum(1 / seq_len(0.5 * params$n_winter)) /
+          sum(1 / seq_len(params$n_winter)) ~
+        " (zilver)",
+      .data$score >=
+        sum(1 / seq_len(0.25 * params$n_winter)) /
+          sum(1 / seq_len(params$n_winter)) ~
+        " (brons)",
+      TRUE ~ ""
+    )
+  ) |>
+  inner_join(
+    x = filter(scores, .data$location_id == params$location), by = "score"
+  ) -> this_score
+```
+
+```{r}
+#| label: cap-format
+relevant_cap <- "Beschikbare tellingen van %s in
+[meetnetten.be](https://meetnetten.be) met het totaal aantal getelde vleermuizen
+per telling.
+Het grijze vlak geeft de analyseperiode weer."
+```
+
+# Overzicht beschikbare tellingen
+
+```{r}
+#| label: detailed
+detailed_text1 <- sprintf(
+  "
+Deze winterverplaats is opgedeeld in %i deellocaties.
+Indien de telling per deellocatie beschikbaar is, geven we het percentage
+van de deellocaties dat onderzocht is tijdens de telling.
+Zoniet vermelden we 'enkel totaal'.",
+  relevant_visits$n_sublocations[1]
+)[relevant_visits$n_sublocations[1] > 1]
+detailed_text2 <-
+  "
+Wanneer gedetailleerde tellingen beschikbaar zijn, dan gebruiken we enkel de
+gedetailleerde tellingen wanneer het aantal winters met gedetailleerde tellingen
+groter is dan het aantal winters met enkel totalen en het aantal winters met
+gedetailleerde tellingen minstens 3 is.
+In dat geval houden we rekening met deellocaties die niet onderzocht zijn en
+waar mogelijk vleermuizen aanwezig zijn.
+Zoniet aggregeren we de gedetailleerde tellingen tot een totaal en doen we de
+analyse op basis van de totalen."[relevant_visits$n_sublocations[1] > 1]
+```
+
+In @fig-relevant geven we een overzicht van alle beschikbare tellingen in [meetnetten.be](https://meetnetten.be) voor het object "`r params$name`".
+Elk punt toont de datum van de telling op de x-as en het totaal aantal getelde vleermuizen op de y-as.`r detailed_text1`
+
+De analyse beschouwt de tellingen van de laatste `r params$n_winter` winters.
+Om relevant te zijn, moeten we tijdens minstens drie verschillende winters vleermuizen aantreffen.`r detailed_text2`
+Indien er meerdere bruikbare tellingen overblijven per winter, kiezen we de telling die het dichtst bij 15 januari valt.
+
+Op basis van de beschikbare tellingen voor de analyse berekenen een score.
+Deze score ligt tussen 0 en 100 en is hoger wanneer er meer winters met telling zijn en wanneer de tellingen recenter zijn.
+Om de maximale score van 100 te behalen, moet er tijdens alle `r params$n_winter` winters minstens één telling zijn.
+De score voor deze winterverblijfplaats is `r sprintf("%.1f%s", this_score$score, this_score$niveau)`.
+Daarmee behoort ze tot de top `r this_score$rang` van de best onderzochte winterverblijfplaatsen in Vlaanderen van de afgelopen `r params$n_winter` winters.
+
+```{r}
+#| label: fig-relevant
+#| fig-cap: !expr 'sprintf(relevant_cap, params$name)'
+paste0(current_winter - params$n_winter, "-7-15") |>
+  as.Date(format = "%Y-%m-%d") -> start_date
+p <- ggplot(relevant_visits, aes(x = date, y = total)) +
+  geom_ribbon(
+    data = data.frame(date = c(start_date, max_date), total = 0),
+    aes(ymin = -Inf, ymax = Inf), fill = inbo_lichtgrijs, alpha = 0.1
+  ) +
+  scale_shape_manual("in analyse", values = c(ja = 17, nee = 8)) +
+  theme(axis.title = element_blank())
+m_tot <- max(relevant_visits$total)
+if (m_tot < 6) {
+  p <- p +
+    scale_y_continuous(
+      limits = c(0, m_tot + 1), breaks = seq_len(m_tot + 2) - 1
+    )
+} else {
+  p <- p +
+    scale_y_continuous(limits = c(0, NA))
+}
+if (relevant_visits$n_sublocations[1] > 1) {
+  p +
+    geom_point(aes(color = onderzocht, shape = analyse)) +
+    scale_colour_discrete("onderzochte\ndeellocaties")
+} else {
+  p + geom_point(aes(shape = analyse))
+}
+```
