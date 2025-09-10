@@ -119,7 +119,8 @@ WHERE
       )
     )
 
-  observations <- bind_rows(individual$observations, section$observations)
+  bind_rows(individual$observations, section$observations) |>
+    semi_join(species, by = c("species_id" = "id")) -> observations
   file.path("data", "hibernation", "observations") |>
     write_vc(
       x = observations,
@@ -146,9 +147,10 @@ WHERE
       )
     )
 
-  file.path("data", "hibernation", "totals") |>
+  total$observations |>
+    semi_join(species, by = c("species_id" = "id")) |>
     write_vc(
-      x = total$observations,
+      file.path("data", "hibernation", "totals"),
       root = target,
       sorting = c("visit_id", "species_id"),
       stage = TRUE,
@@ -251,4 +253,10 @@ Only given when no observations at the sublocation level are available.",
         problem = "Description of the issue"
       )
     )
+  commit(
+    message = "Automated commit from abvanalysis",
+    repo = analysis_data,
+    session = TRUE,
+    all = TRUE
+  )
 }
