@@ -123,7 +123,7 @@ De analyse beschouwt de tellingen van de laatste `r params$n_winter` winters.
 Om relevant te zijn, moeten we tijdens minstens drie verschillende winters vleermuizen aantreffen.`r detailed_text2`
 Indien er meerdere bruikbare tellingen overblijven per winter, kiezen we de telling die het dichtst bij 15 januari valt.
 
-Op basis van de beschikbare tellingen voor de analyse berekenen een score.
+Op basis van de beschikbare tellingen voor de analyse berekenen we een score.
 Deze score ligt tussen 0 en 100 en is hoger wanneer er meer winters met telling zijn en wanneer de tellingen recenter zijn.
 Om de maximale score van 100 te behalen, moet er tijdens alle `r params$n_winter` winters minstens één telling zijn.
 De score voor deze winterverblijfplaats is `r sprintf("%.1f%s", this_score$score, this_score$niveau)`.
@@ -142,7 +142,7 @@ p <- ggplot(relevant_visits, aes(x = date, y = total)) +
   scale_shape_manual("in analyse", values = c(ja = 17, nee = 8)) +
   theme(axis.title = element_blank())
 m_tot <- max(relevant_visits$total)
-if (m_tot < 6) {
+if (m_tot <= 10) {
   p <- p +
     scale_y_continuous(
       limits = c(0, m_tot + 1), breaks = seq_len(m_tot + 2) - 1

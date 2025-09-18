@@ -625,7 +625,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
 #' @importFrom stringr str_detect
 #' @importFrom stats quantile
 #' @importFrom tibble rownames_to_column
-#' @importFrom tidyr everything pivot_longer pivot_wider
+#' @importFrom tidyr everything pivot_longer pivot_wider unnest
 extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
   assert_that(inherits(x, "n2kSpde"), is.count(n_sim), noNA(n_sim))
   # skip if model is not converged

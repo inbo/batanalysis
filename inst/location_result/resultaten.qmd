@@ -94,6 +94,7 @@ display_intro <- function(this_species, species) {
   species$name[species$species == this_species]
 }
 display_totals <- function(timeseries, this_species, raw_data) {
+  stopifnot(require("dplyr"), require("ggplot2"))
   timeseries |>
     filter(.data$species == this_species) -> this_totals
   raw_data |>
@@ -132,6 +133,7 @@ display_totals <- function(timeseries, this_species, raw_data) {
   return(this_totals)
 }
 display_flanders <- function(flanders, this_species) {
+  stopifnot(require("dplyr"), require("ggplot2"))
   flanders |>
     filter(.data$species == this_species) -> this_flanders
   p <- ggplot(this_flanders, aes(x = .data$winter)) +
@@ -146,6 +148,7 @@ display_flanders <- function(flanders, this_species) {
   return(this_flanders)
 }
 display_ratio <- function(this_flanders, this_totals) {
+  stopifnot(require("dplyr"), require("ggplot2"))
   p <- this_flanders |>
     select("winter", flanders = "mean") |>
     inner_join(this_totals, by = "winter") |>

@@ -49,7 +49,7 @@ relevant_visit |>
   ) -> to_do
 
 dir.create("reports", showWarnings = FALSE)
-template <- readLines("quarto.template")
+template <- readLines("_quarto.yml")
 for (i in seq_len(nrow(to_do))) {
   message(to_do$name[i])
   target <- file.path(

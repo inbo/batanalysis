@@ -31,7 +31,7 @@ if (file_test("-d", analysis_data)) {
 prepare_analysis_data(
   raw_data = target,
   analysis_data = analysis_data,
-  start = 2007,
+  start = as.integer(format(Sys.Date(), "%Y")) - 23,
   n_winter = 4,
   n_present = 3,
   strict = FALSE

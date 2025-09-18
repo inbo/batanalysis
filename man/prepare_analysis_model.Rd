@@ -22,8 +22,6 @@ prepare_analysis_model(
 )
 }
 \arguments{
-\item{analysis_data}{A gity repository to store the analysis data.}
-
 \item{base}{The base location to store the model.}
 
 \item{max_dist}{The maximum distance for the range in kilometres}

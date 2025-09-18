@@ -9,7 +9,7 @@
 #' @importFrom DBI dbGetQuery
 #' @importFrom dplyr anti_join bind_rows count distinct filter inner_join
 #' semi_join transmute
-#' @importFrom git2rdata write_vc
+#' @importFrom git2rdata commit write_vc
 #' @importFrom rlang .data
 import_raw_data <- function(
   origin,
@@ -255,7 +255,7 @@ Only given when no observations at the sublocation level are available.",
     )
   commit(
     message = "Automated commit from abvanalysis",
-    repo = analysis_data,
+    repo = target,
     session = TRUE,
     all = TRUE
   )

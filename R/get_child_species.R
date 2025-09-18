@@ -1,6 +1,7 @@
 #' Returns a list of species that are children of the target species
 #' @inheritParams import_raw_data
 #' @inheritParams select_imputation_section
+#' @param species the ID of the species
 #' @export
 #' @importFrom assertthat assert_that is.string noNA
 #' @importFrom dplyr bind_rows filter select semi_join

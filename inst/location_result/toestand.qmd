@@ -109,12 +109,13 @@ observed_count |>
 
 ```{r}
 #| label: cap-format
-toestand_cap <- "De meest recente totalen per soort voor %s."
+toestand_cap <- "De totalen per soort voor %s tijdens de winter van %i."
 ```
 
 ```{r}
 #| label: fig-recent
-#| fig.cap: !expr 'sprintf(toestand_cap, params$name)'
+#| fig.cap: !expr
+#| 'sprintf(toestand_cap, params$name, max(recent$winter, na.rm = TRUE))'
 recent |>
   ggplot(aes(x = name)) +
   geom_bar(stat = "identity", aes(y = p05), alpha = 0.2) +
