@@ -2,12 +2,12 @@ citHeader("To cite `batanalysis` in publications please use:")
 # begin checklist entry
 bibentry(
   bibtype = "Manual",
-  title = "batanalysis: Analysis of Bat Monitoring Data in Flanders. Version 0.0.1",
-  author = c( author = c(person(given = "Thierry", family = "Onkelinx"))),
-  year = 2024,
+  title = "batanalysis: Analysis of Bat Monitoring Data in Flanders. Version 0.0.2",
+  author = c(person(given = "Thierry", family = "Onkelinx")),
+  year = 2025,
   url = "https://github.com/inbo/batanalysis/",
   abstract = "The reproducible analysis of the bat monitoring data in Flanders for the reporting of the habitat directive.",
-  textVersion = "Onkelinx, Thierry (2024) batanalysis: Analysis of Bat Monitoring Data in Flanders. Version 0.0.1. https://github.com/inbo/batanalysis/",
+  textVersion = "Onkelinx, Thierry (2025) batanalysis: Analysis of Bat Monitoring Data in Flanders. Version 0.0.2. https://github.com/inbo/batanalysis/",
   keywords = "hibernating bats; natura2000; habitat directive",
 )
 # end checklist entry

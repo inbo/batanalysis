@@ -1,6 +1,6 @@
 {
   "title": "batanalysis: Analysis of Bat Monitoring Data in Flanders",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "GPL-3.0",
   "upload_type": "software",
   "description": "<p>The reproducible analysis of the bat monitoring data in Flanders for the reporting of the habitat directive.<\/p>",

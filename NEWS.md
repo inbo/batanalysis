@@ -1,3 +1,8 @@
+# batanalysis 0.0.2
+
+* Update the imputation models
+* Calculate totals per location type
+
 # batanalysis 0.0.1
 
 * First draft of the analysis

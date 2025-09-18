@@ -21,4 +21,4 @@ repository-code: https://github.com/inbo/batanalysis/
 type: software
 abstract: "The reproducible analysis of the bat monitoring data in Flanders for the
   reporting of the habitat directive."
-version: 0.0.1
+version: 0.0.2
