@@ -26,7 +26,7 @@ prepare_analysis_model(
 
 \item{base}{The base location to store the model.}
 
-\item{max_dist}{The maximum distance for the range in kilometers}
+\item{max_dist}{The maximum distance for the range in kilometres}
 
 \item{project}{Will be a relative path within the base location.}
 
