@@ -1,8 +1,10 @@
+::: {lang=nl-BE}
 ## Baardvleermuis en Brandts' vleermuis
 
-De Baardvleermuis (_Myotis mystacinus_) en de Brandts' vleermuis (_Myotis brandtii_) lijken zeer sterk op elkaar.
+De Baardvleermuis (_[Myotis mystacinus]{lang=sc-WO}_) en
+de Brandts' vleermuis (_[Myotis brandtii]{lang=sc-WO}_) lijken zeer sterk op elkaar.
 Tijdens wintertellingen is het moeilijk de afzonderlijke soorten te herkennen.
-Tijdens de telling maken we dan ook meestal geen onderscheid en noteren ze onder de gezamenlijke noemer "baardvleermuis spec.".
+Tijdens de telling maken we dan ook meestal geen onderscheid en noteren ze onder de gezamenlijke noemer "baardvleermuis [spec]{lang=sc-WO}.".
 
 Baardvleermuizen verkiezen 's zomers spechtengaten en spleten in bomen.
 Beide soorten hebben een sterke voorkeur voor het bos als jachtbiotoop (liefst brede paden, kapplaatsen, parkachtige gebieden en bosranden).
@@ -14,3 +16,4 @@ We vinden baardvleermuizen hoofdzakelijk in hun overwinteringsplaatsen.
 Van deze soort zijn in Vlaanderen weinig kraamkolonies gekend.
 Dit maakt ze erg kwetsbaar.
 Vermoedelijk hangt hun zeldzaamheid samen met het gebrek aan geschikte boshabitats.
+:::

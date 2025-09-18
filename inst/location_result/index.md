@@ -1,3 +1,4 @@
+::: {lang=nl-BE}
 # Woord vooraf {-}
 
 Hier komt een kort woord vooraf.
@@ -19,18 +20,19 @@ _Info per soort_
 - Zetten we bij elke soort een foto van de soort?
   Zo ja, een foto van een dier in winterslaap?
   Of eerder van een wakker dier, al dan niet vliegend?
-  Mits aanvraag via Nicole en naamsvermelding kunnen we kiezen uit de collectie van Vilda.
+  Mits aanvraag via Nicole en naamsvermelding kunnen we kiezen uit de collectie van Vilda.<!-- spell-check: ignore -->
 - Zetten we bij elke soort een verspreidingskaart?
   Op basis van GBIF data is dat doenbaar.
-  Waarnemingen.be mogelijk ook als ze een API aanbieden.
+  Waarnemingen.be mogelijk ook als ze een API aanbieden.<!-- spell-check: ignore -->
 
 <!-- spell-check: ignore:start-->
-::: {.content-visible when-format="pdf"}
+:::: {.content-visible when-format="pdf"}
 \clearpage
 \phantomsection
 \addcontentsline{toc}{chapter}{\contentsname}
 \setcounter{tocdepth}{2}
 \tableofcontents
-:::
+::::
 <!-- spell-check: ignore:end-->
 
+:::

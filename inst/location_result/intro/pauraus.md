@@ -1,7 +1,9 @@
+::: {lang=nl-BE}
 ## Gewone grootoorvleermuis en Grijze grootoorvleermuis
 
-Tijdens de wintertelingen is het moeilijk om een onderscheid te maken tussen de Gewone grootoorvleermuis (_Plecotus auritus_) en de Grijze grootoorvleermuis (_Plecotus austriacus_).
-We noteren ze onder de gezamelijke noemer "grootoorvleermuis".
+Tijdens de wintertelingen is het moeilijk om een onderscheid te maken tussen de Gewone grootoorvleermuis (_[Plecotus auritus]{lang=sc-WO}_) en
+de Grijze grootoorvleermuis (_[Plecotus austriacus]{lang=sc-WO}_).
+We noteren ze onder de gezamenlijke noemer "grootoorvleermuis".
 
 In Vlaanderen zijn Gewone grootoorvleermuizen algemeen verspreid, maar nergens in grote aantallen.
 Voor hun jachtbiotoop is de aanwezigheid van bomen (vooral oude loof- en gemengde bossen) van zeer groot belang.
@@ -16,3 +18,4 @@ Voorlopig blijft het een zeer zeldzame soort in Vlaanderen.
 
 De bedreigingen voor beide soorten zijn onvoldoende gekend.
 Het lokaal verdwijnen wordt meestal toegeschreven aan beschadiging of verstoring van de verblijfplaatsen en aan de teloorgang van de jachtgebieden.
+:::

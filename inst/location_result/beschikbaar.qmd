@@ -116,7 +116,8 @@ Zoniet aggregeren we de gedetailleerde tellingen tot een totaal en doen we de
 analyse op basis van de totalen."[relevant_visits$n_sublocations[1] > 1]
 ```
 
-In @fig-relevant geven we een overzicht van alle beschikbare tellingen in [meetnetten.be](https://meetnetten.be) voor het object "`r params$name`".
+In @fig-relevant geven we een overzicht van alle beschikbare tellingen in [meetnetten.be](https://meetnetten.be) <!-- spell-check: ignore -->
+voor het object "`r params$name`".
 Elk punt toont de datum van de telling op de x-as en het totaal aantal getelde vleermuizen op de y-as.`r detailed_text1`
 
 De analyse beschouwt de tellingen van de laatste `r params$n_winter` winters.

@@ -1,6 +1,7 @@
+::: {lang=nl-BE}
 ## Ingekorven vleermuis
 
-De Ingekorven vleermuis (_Myotis emarginatus_) is een zeer kwetsbare soort.
+De Ingekorven vleermuis (_[Myotis emarginatus]{lang=sc-WO}_) is een zeer kwetsbare soort.
 Vanwege haar zeldzaamheid is er weinig over haar zomergedrag in Vlaanderen geweten.
 Er zijn slechts enkele kraamkolonies bekend.
 
@@ -12,3 +13,4 @@ De Ingekorven vleermuis is bovendien een verstoringsgevoelige soort.
 De gewoonte van de soort om vrij aan het plafond te hangen maakt deze dieren nog extra kwetsbaar.
 
 Dankzij speciale bescherming (bv 's winters afsluiten) van de bekende overwinteringsplaatsen nemen de aantallen van deze vleermuis langzaam terug toe.
+:::
