@@ -194,34 +194,44 @@ select_imputation_detail <- function(
     group_by(.data$location_id) |>
     filter(n() >= n_winter, sum(.data$number > 0) >= n_present) |>
     ungroup() -> only_totals
-  only_totals |>
-    complete(
-      .data$location_id,
-      winter = min(.data$winter):(max(.data$winter) + 1)
-    ) |>
-    inner_join(
-      only_totals |>
-        filter(.data$number > 1) |>
-        select("location_id", present = "winter"),
-      by = "location_id",
-      relationship = "many-to-many"
-    ) |>
-    slice_min(
-      abs(.data$present - .data$winter),
-      n = 1,
-      with_ties = FALSE,
-      by = c("location_id", "winter")
-    ) |>
-    filter(abs(.data$present - .data$winter) <= n_extrapolation) |>
-    mutate(
-      datafield_id = ifelse(is.na(.data$visit_id), 4L, 2L),
-      observation_id = ifelse(
-        is.na(.data$visit_id),
-        -100000 * .data$winter - .data$location_id,
-        .data$visit_id
-      )
-    ) |>
-    select(-"present", -"visit_id") -> location_data
+  if (nrow(only_totals) == 0) {
+    location_data <- data.frame(
+      location_id = integer(0),
+      winter = integer(0),
+      observation_id = integer(0),
+      number = integer(0),
+      datafield_id = integer(0)
+    )
+  } else {
+    only_totals |>
+      complete(
+        .data$location_id,
+        winter = min(.data$winter):(max(.data$winter) + 1)
+      ) |>
+      inner_join(
+        only_totals |>
+          filter(.data$number > 1) |>
+          select("location_id", present = "winter"),
+        by = "location_id",
+        relationship = "many-to-many"
+      ) |>
+      slice_min(
+        abs(.data$present - .data$winter),
+        n = 1,
+        with_ties = FALSE,
+        by = c("location_id", "winter")
+      ) |>
+      filter(abs(.data$present - .data$winter) <= n_extrapolation) |>
+      mutate(
+        datafield_id = ifelse(is.na(.data$visit_id), 4L, 2L),
+        observation_id = ifelse(
+          is.na(.data$visit_id),
+          -100000 * .data$winter - .data$location_id,
+          .data$visit_id
+        )
+      ) |>
+      select(-"present", -"visit_id") -> location_data
+  }
   return(list(
     sublocation = sublocation_data,
     location = location_data,

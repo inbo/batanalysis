@@ -131,10 +131,21 @@ prepare_analysis_model_species <- function(
   # calculate polynomial coefficients for winter
   bind_rows(detail$sublocation, detail$location, no_detail) |>
     inner_join(locations, by = "location_id") -> dataset
-  min(dataset$winter) |>
-    seq(max(dataset$winter)) |>
-    poly(degree = 3) -> poly_winter
   dataset |>
+    filter(.data$number > 0) |>
+    distinct(.data$winter) |>
+    complete(winter = min(.data$winter):(max(.data$winter) + 1)) |>
+    mutate(
+      winter_r = .data$winter - min(.data$winter) + 1,
+      winter_l = poly(.data$winter, 3)[, 1] |>
+        zapsmall(),
+      winter_q = poly(.data$winter, 3)[, 2] |>
+        zapsmall(),
+      winter_c = poly(.data$winter, 3)[, 3] |>
+        zapsmall()
+    ) -> poly_winter
+  dataset |>
+    inner_join(poly_winter, by = "winter") |>
     transmute(
       .data$observation_id,
       .data$datafield_id,
@@ -149,19 +160,19 @@ prepare_analysis_model_species <- function(
       small = as.integer(.data$type == "small"),
       # centre winter to the starting year
       .data$winter,
-      winter_r = .data$winter - start_winter + 1,
+      .data$winter_r,
       # linear polynomial coefficient for winter
-      winter_l = poly_winter[.data$winter_r, 1],
       location_l = .data$location,
       sublocation_l = .data$sublocation,
+      .data$winter_l,
       # quadratic polynomial coefficient for winter
-      winter_q = poly_winter[.data$winter_r, 2],
       location_q = .data$location,
       sublocation_q = .data$sublocation,
+      .data$winter_q,
       # cubic polynomial coefficient for winter
-      winter_c = poly_winter[.data$winter_r, 3],
       location_c = .data$location,
       sublocation_c = .data$sublocation,
+      .data$winter_c,
       .data$X,
       .data$Y
     ) -> dataset
@@ -169,16 +180,16 @@ prepare_analysis_model_species <- function(
     group_by(.data$sublocation) |>
     mutate(
       n_winter = n_distinct(.data$winter_c[!is.na(.data$present)]),
-      subwinter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA),
-      subwinter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA),
-      subwinter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA)
+      subwinter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA_real_),
+      subwinter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA_real_),
+      subwinter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA_real_)
     ) |>
     group_by(.data$location) |>
     mutate(
       n_winter = n_distinct(.data$winter_c[!is.na(.data$present)]),
-      winter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA),
-      winter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA),
-      winter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA)
+      winter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA_real_),
+      winter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA_real_),
+      winter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA_real_)
     ) |>
     ungroup() |>
     select(-"n_winter", -"number") -> ds_present
@@ -186,25 +197,25 @@ prepare_analysis_model_species <- function(
     group_by(.data$sublocation) |>
     mutate(
       n_winter = n_distinct(.data$winter_c[!is.na(.data$number)]),
-      subwinter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA),
-      subwinter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA),
-      subwinter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA)
+      subwinter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA_real_),
+      subwinter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA_real_),
+      subwinter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA_real_)
     ) |>
     group_by(.data$location) |>
     mutate(
       n_winter = n_distinct(.data$winter_c[!is.na(.data$number)]),
-      winter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA),
-      winter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA),
-      winter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA)
+      winter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA_real_),
+      winter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA_real_),
+      winter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA_real_)
     ) |>
     ungroup() |>
     mutate(observation_id = as.integer(.data$observation_id)) |>
     select(-"n_winter", -"present") -> ds_number
   detail$rare_sublocations |>
+    inner_join(poly_winter, by = "winter") |>
     mutate(
-      location = factor(NA, levels = levels(ds_number$location)),
+      location = factor(.data$location_id, levels = levels(ds_number$location)),
       sublocation = factor(NA, levels = levels(ds_number$sublocation)),
-      winter_r = .data$winter - start_winter + 1,
       location_l = .data$location,
       location_q = .data$location,
       location_c = .data$location,
@@ -241,14 +252,30 @@ prepare_analysis_model_species <- function(
     select(c("X", "Y")) |>
     spde(range = c(max_dist, 0.9), sigma = c(1, 0.01)) -> spde
   presence <- n2k_spde(
-    formula = "
-present ~ 0 + fortress + marl_quarry + other_large + small +
-      f(
+    formula = paste(
+      "present ~ 0",
+      paste(
+        c(
+          "fortress"[any(ds_present$fortress > 0)],
+          "marl_quarry"[any(ds_present$marl_quarry > 0)],
+          "other_large"[any(ds_present$other_large > 0)],
+          "small"[any(ds_present$small > 0)]
+        ),
+        collapse = " +\n"
+      ),
+      "f(
         winter_r,
         model = \"rw1\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.15, 0.05)))
       ) +
       f(
+        sublocation,
+        model = \"iid\",
+        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
+      )",
+      paste(
+        c(
+          "      f(
         location,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
@@ -270,30 +297,30 @@ present ~ 0 + fortress + marl_quarry + other_large + small +
         winter_c,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-      ) +
-      f(
-        sublocation,
-        model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
-      ) +
-      f(
+      )"[length(unique(ds_present$location)) > 1],
+          "f(
         sublocation_l,
         subwinter_l,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      ) +
-      f(
+      )"[any(!is.na(ds_present$subwinter_l))],
+          "f(
         sublocation_q,
         subwinter_q,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      ) +
-      f(
+      )"[any(!is.na(ds_present$subwinter_q))],
+          "f(
         sublocation_c,
         subwinter_c,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )",
+      )"[any(!is.na(ds_present$subwinter_c))]
+        ),
+        collapse = " +\n"
+      ),
+      sep = " +\n "
+    ),
     model_type = "inla binomial: SPDE + Winter * (1 + Location + SubLocation)",
     data = ds_present,
     result_datasource_id = "git",
@@ -312,14 +339,31 @@ present ~ 0 + fortress + marl_quarry + other_large + small +
   store_model(presence, base = base, project = project, overwrite = overwrite)
 
   count <- n2k_spde(
-    formula = "
-number ~ 0 + fortress + marl_quarry + other_large + small +
-      f(
+    formula = paste(
+      "number ~ 0",
+      paste(
+        c(
+          "fortress"[any(ds_number$fortress > 0)],
+          "marl_quarry"[any(ds_number$marl_quarry > 0)],
+          "other_large"[any(ds_number$other_large > 0)],
+          "small"[any(ds_number$small > 0)]
+        ),
+        collapse = " +\n"
+      ),
+
+      "f(
         winter_r,
         model = \"rw1\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.15, 0.05)))
-      ) +
-      f(
+      )",
+      "f(
+        sublocation,
+        model = \"iid\",
+        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
+      )",
+      paste(
+        c(
+          "f(
         location,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
@@ -341,30 +385,30 @@ number ~ 0 + fortress + marl_quarry + other_large + small +
         winter_c,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-      ) +
-      f(
-        sublocation,
-        model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
-      ) +
-      f(
+      )"[length(unique(ds_number$location)) > 1],
+          "f(
         sublocation_l,
         subwinter_l,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      ) +
-      f(
+      )"[any(!is.na(ds_number$subwinter_l))],
+          "f(
         sublocation_q,
         subwinter_q,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      ) +
-      f(
+      )"[any(!is.na(ds_number$subwinter_q))],
+          "f(
         sublocation_c,
         subwinter_c,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )",
+      )"[any(!is.na(ds_number$subwinter_c))]
+        ),
+        collapse = " +\n"
+      ),
+      sep = " +\n"
+    ),
     model_type = paste(
       "inla zeroinflatednbinomial0:",
       "SPDE + Winter * (1 + Location + SubLocation)"

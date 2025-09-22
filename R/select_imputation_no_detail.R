@@ -65,6 +65,15 @@ select_imputation_no_detail <- function(
     group_by(.data$location_id) |>
     filter(n() >= n_winter, sum(.data$number > 0) >= n_present) |>
     ungroup() -> observed
+  if (nrow(observed) == 0) {
+    return(data.frame(
+      location_id = integer(0),
+      winter = integer(0),
+      observation_id = integer(0),
+      number = integer(0),
+      datafield_id = integer(0)
+    ))
+  }
   observed |>
     # add unvisited winters per location
     complete(

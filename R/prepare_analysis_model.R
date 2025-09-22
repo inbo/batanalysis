@@ -52,9 +52,9 @@ prepare_analysis_model <- function(
       project = project,
       docker = "inbobmk/rn2k:dev-0.10",
       dependencies = c(
-        "inbo/multimput@v0.2.14",
-        "inbo/n2khelper@v0.5.0",
-        "inbo/n2kanalysis@spde"
+        "inbo/multimput@hotfix",
+        "inbo/n2khelper@0.5.1",
+        "inbo/n2kanalysis@0.4.1"
       )
     ) |>
     basename() |>

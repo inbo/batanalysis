@@ -8,6 +8,8 @@ get_child_species(target, species)
 }
 \arguments{
 \item{target}{A \code{git_repository} object to store the imported data.}
+
+\item{species}{the ID of the species}
 }
 \description{
 Returns a list of species that are children of the target species
