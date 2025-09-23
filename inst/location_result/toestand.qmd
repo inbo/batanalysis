@@ -9,7 +9,7 @@ params:
 
 # Overzicht van de huidige toestand
 
-In @fig-recent geven we een overzicht van het meest recente totaal aantal per soort voor `r params$name`.
+In @fig-recent geven we een overzicht van het totaal aantal per soort voor `r params$name` tijdens de meest recente beschikbare telling.
 Indien de balk deels transparant is, dan is dat een indicatie dat het winterverblijf tijdens de laatste winter niet (volledig) onderzocht is.
 Op dat ogenblik doen we een schatting op basis van de beschikbare statistische modellen.
 Hoe donkerder de band hoe meer zekerheid we hebben dat dat bepaalde aantal vleermuizen minstens aanwezig is.
@@ -18,6 +18,7 @@ Hoe donkerder de band hoe meer zekerheid we hebben dat dat bepaalde aantal vleer
 #| label: setup
 #| include: false
 library(batanalysis)
+library(effectclass)
 library(git2rdata)
 library(INBOtheme)
 library(scales)
@@ -30,82 +31,75 @@ result_root <- repository(params$result)
 
 ```{r}
 #| label: read-data
-file.path("hibernation", "total_location") |>
-  verify_vc(root = result_root, variables = c("species", "winter", "mean")) |>
-  filter(.data$location == params$location) |>
-  filter(.data$winter == max(.data$winter)) |>
-  select("species", "winter", "mean", "min", "max", matches("p[0-9]")) |>
-  slice_head(n = 1, by = "species") -> analysis
-read_vc("relevant_visit") |>
-  filter(.data$location_id == params$location) |>
-  filter(.data$relevant) |>
-  semi_join(analysis, by = "winter") -> relevant_visit
-file.path("data", "hibernation", "samples") |>
-  verify_vc(
-    root = data_root, variables = c("visit_id", "sample_id")
-  ) |>
-  semi_join(relevant_visit, by = "visit_id") -> detailed
-if (nrow(detailed) > 0) {
-  file.path("data", "hibernation", "observations") |>
-    verify_vc(
-      root = data_root, variables = c("sample_id", "species_id")
-    ) |>
-    semi_join(detailed, by = "sample_id") |>
-    group_by(.data$species_id) |>
-    summarise(observed = sum(.data$number)) -> observed_count
-} else {
-  file.path("data", "hibernation", "totals") |>
-    verify_vc(
-      root = data_root, variables = c("visit_id", "species_id", "total")
-    ) |>
-    semi_join(relevant_visit, by = "visit_id") |>
-    select(-"visit_id", observed = "total") -> observed_count
-}
+verify_vc("relevant_visit", root = ".", variables = c("location_id")) |> 
+  filter(.data$location_id == params$location, .data$relevant) |>
+  slice_max(.data$winter, n = 1) -> relevant
 get_child_species(data_root, "Mmysbra") |>
-  transmute(species_id = .data$id, species = "mmysbra") |>
+  transmute(species_id = .data$id, species = "Mmysbra") |>
   bind_rows(
     get_child_species(data_root, "Pipspec") |>
-      transmute(species_id = .data$id, species = "pipspec"),
+      transmute(species_id = .data$id, species = "Pipspec"),
     get_child_species(data_root, "Pauraus") |>
-      transmute(species_id = .data$id, species = "pauraus"),
+      transmute(species_id = .data$id, species = "Pauraus"),
     get_child_species(data_root, "Nspec") |>
-      transmute(species_id = .data$id, species = "nspec")
+      transmute(species_id = .data$id, species = "Nspec")
   ) -> combined_species
 file.path("data", "hibernation", "species") |>
   verify_vc(
     root = data_root, variables = c("id", "code", "name", "scientific_name")
   ) |>
-  transmute(species = tolower(.data$code), .data$name, .data$id) -> species
-observed_count |>
-  inner_join(combined_species, by = "species_id") |>
-  group_by(.data$species) |>
-  summarise(observed = sum(.data$observed), .groups = "drop") |>
-  inner_join(
-    species |>
-      select(-"id"),
-    by = "species"
+  select(-"parent") -> species
+if (relevant$surveyed_sublocations > 1) {
+  file.path("data", "hibernation", "samples") |>
+    verify_vc(root = data_root, variables = c("sample_id", "visit_id")) |>
+    semi_join(relevant, by = "visit_id") |>
+    inner_join(
+      file.path("data", "hibernation", "observations") |>
+        verify_vc(
+          root = data_root, variables = c("sample_id", "species_id", "number")
+        ),
+      by = "sample_id"
+    ) -> observed
+  observed |>
+    inner_join(combined_species, by = "species_id") |>
+    group_by(.data$species) |>
+    summarise(observed = sum(.data$number), .groups = "drop") |>
+    bind_rows(
+      observed |>
+        anti_join(combined_species, by = "species_id") |>
+        inner_join(
+          species |>
+            select("species_id" = "id", "species" = "code"),
+          by = "species_id"
+        ) |>
+        group_by(.data$species) |>
+        summarise(observed = sum(.data$number), .groups = "drop")
+    ) -> observed
+} else {
+  stop("total")
+}
+file.path("hibernation", "total_location") |>
+  verify_vc(
+    root = result_root, variables = c("species", "location", "winter")
   ) |>
-  bind_rows(
-    observed_count |>
-      anti_join(combined_species, by = "species_id") |>
-      inner_join(species, by = c("species_id" = "id")) |>
-      select(-"species_id")
-  ) |>
-  left_join(analysis, by = "species") |>
+  semi_join(relevant, by = c("location" = "location_id", "winter")) |>
+  select("species", "winter", "mean", starts_with("p")) |>
+  left_join(x = observed, by = "species") |>
   mutate(
-    across(
-      c("mean", matches("p[0-9]")),
-      ~ifelse(is.na(.x), .data$observed, .x)
-    ),
-    name = reorder(.data$name, .data$mean),
     label = ifelse(
-      is.na(.data$winter),
+      is.na(.data$mean),
       .data$observed,
-      sprintf("%.0f (%.0f; %.0f)", .data$mean, .data$p05, .data$p95)
-    )
-  ) -> recent
+      ifelse(
+        .data$p05 == .data$p95,
+        .data$mean,
+        sprintf("%.1f, (%.1f; %.1f)", .data$mean, .data$p05, .data$p95)
+      )
+    ),
+    across(starts_with("p"), ~ ifelse(is.na(.x), .data$observed, .x))
+  ) |>
+  inner_join(species, by = c("species" = "code")) |>
+  mutate(name = reorder(.data$name, .data$p50)) -> recent
 ```
-
 
 ```{r}
 #| label: cap-format
@@ -114,8 +108,7 @@ toestand_cap <- "De totalen per soort voor %s tijdens de winter van %i."
 
 ```{r}
 #| label: fig-recent
-#| fig.cap: !expr
-#| 'sprintf(toestand_cap, params$name, max(recent$winter, na.rm = TRUE))'
+#| fig.cap: !expr 'sprintf(toestand_cap, params$name, recent$winter)'
 recent |>
   ggplot(aes(x = name)) +
   geom_bar(stat = "identity", aes(y = p05), alpha = 0.2) +
