@@ -7,156 +7,259 @@ params:
   n_winter: 24
 ---
 
+# Overzicht van de beschikbare tellingen
+
 ```{r}
 #| label: setup
 #| include: false
 library(git2rdata)
+library(ggrepel)
 library(INBOtheme)
+library(knitr)
+library(scales)
 library(tidyverse)
 conflicted::conflicts_prefer(dplyr::filter, dplyr::lag, dplyr::pull)
 theme_set(theme_inbo(base_size = 9, transparent = TRUE))
+data_root <- repository(params$data)
 ```
 
 ```{r}
 #| label: read-data
-relevant <- read_vc("relevant_visit")
-max_date <- max(relevant$date)
-round_date(max_date, "year") |>
-  year() -> current_winter
-relevant |>
+#| include: false
+raw_visits <- verify_vc(
+  "visit_type", root = ".", variables = c("visit_id", "type", "score")
+)
+raw_visits |>
   filter(.data$location_id == params$location) |>
   mutate(
-    analyse = ifelse(relevant, "ja", "nee"),
-    onderzocht = (.data$surveyed_sublocations / .data$n_sublocations) |>
-      cut(
-        breaks = c(0, 0.25, 0.5, 0.75, 1, Inf), right = FALSE,
-        labels = c("0-25%", "25-50%", "50-75%", "75-100%", "100%")
-      ) |>
-      as.character() |>
-      replace_na("enkel\ntotaal") |>
+    visit_id = reorder(.data$visit_id, .data$date),
+    detailgraad = case_when(
+      .data$type == "alternative detail" ~ "alternatief detail",
+      .data$type == "extra detail" ~ "bijkomend detail",
+      .data$type == "extra" ~ "bijkomend",
+      .data$type %in% c("total_detail", "extra total") ~
+        "bijkomend",
+      .data$type == "old detail" ~ "oud detail",
+      .data$type %in% "old total" ~ "oud totaal",
+      .data$type == "old detail" ~ "oud",
+      .data$level == "detail" & .data$type == "detail" ~ "bruikbaar detail",
+      .data$level == "mixed" & .data$type == "detail" ~
+        "bruikbaar detail als totaal",
+      .data$level == "rare" & .data$type == "detail" ~
+        "nog niet bruikbaar detail",
+      .data$level == "rare" & .data$type == "total" ~ 
+        "nog niet bruikbaar totaal",
+      .data$type == "rare" ~ "nog niet bruikbaar",
+      .data$type == "potential" ~ "bruikbaar",
+      .data$level == "mixed" & .data$type == "total" ~ "bruikbaar totaal",
+      .data$level == "detail" & .data$type == "total" ~ "niet gebruikt totaal",
+      TRUE ~ NA_character_
+    ) |>
       factor(
         levels = c(
-          "100%", "75-100%", "50-75%", "0-25%", "25-50%", "enkel\ntotaal"
+          "bruikbaar detail", "bruikbaar detail als totaal",
+          "bruikbaar totaal", "bruikbaar", "alternatief detail",
+          "nog niet bruikbaar detail", "nog niet bruikbaar totaal",
+          "bijkomend detail", "bijkomend totaal", "bijkomend",
+          "niet gebruikt totaal", "oud detail", "oud totaal", "oud"
         )
       )
-  ) -> relevant_visits
-relevant |>
-  filter(current_winter - .data$winter <= params$n_winter) |>
-  mutate(
-    score = ifelse(
-      max(.data$n_sublocations) > 1 & !is.na(.data$surveyed_sublocations),
-      0.5, 1
-    ) /
-      (current_winter - .data$winter + 1)
   ) |>
-  group_by(.data$location_id, .data$winter) |>
-  summarise(score = max(.data$score), .groups = "drop_last") |>
+  arrange(.data$date, .data$visit_id) -> visits
+raw_visits |>
+  filter(.data$score > 0) |>
+  distinct(.data$location_id, .data$winter, .data$score) |>
+  group_by(.data$location_id) |>
   summarise(score = sum(.data$score)) |>
   mutate(
-    score = 100 * .data$score / sum(1 / seq_len(params$n_winter))
+    rang = rank(-.data$score, ties.method = "min"),
+    badge = case_when(
+      .data$score >= sum(1 / seq_len(18)) / sum(1 / seq_len(24)) ~ "goud",
+      .data$score >= sum(1 / seq_len(12)) / sum(1 / seq_len(24)) ~ "zilver",
+      .data$score >= sum(1 / seq_len(6)) / sum(1 / seq_len(24)) ~ "brons",
+      TRUE ~ "geen"
+    ) |>
+      factor(levels = c("geen", "brons", "zilver", "goud"))
   ) -> scores
 scores |>
-  count(.data$score) |>
-  arrange(desc(.data$score)) |>
-  transmute(
-    .data$score,
-    rang = lag(.data$n, 1, default = 1) |>
-      cumsum(),
-    rang = sprintf("%.1f%%", 100 * .data$rang / nrow(scores)),
-    niveau = case_when(
-      .data$score >=
-        sum(1 / seq_len(0.75 * params$n_winter)) /
-          sum(1 / seq_len(params$n_winter)) ~
-        " (goud)",
-      .data$score >=
-        sum(1 / seq_len(0.5 * params$n_winter)) /
-          sum(1 / seq_len(params$n_winter)) ~
-        " (zilver)",
-      .data$score >=
-        sum(1 / seq_len(0.25 * params$n_winter)) /
-          sum(1 / seq_len(params$n_winter)) ~
-        " (brons)",
-      TRUE ~ ""
-    )
-  ) |>
-  inner_join(
-    x = filter(scores, .data$location_id == params$location), by = "score"
+  filter(.data$location_id == params$location) |>
+  mutate(
+    extra = ifelse(.data$badge == "geen", "", sprintf(" (%s)", .data$badge)),
+    tekst = sprintf("%.1f%%%s", 100 * .data$score, .data$extra)
   ) -> this_score
 ```
 
+In @fig-overzicht-bruikbaar geven we een overzicht van de beschikbare tellingen voor `r params$name`.
+We splitsen deze tellingen op in een aantal categorieën naargelang hun bruikbaarheid voor de analyse op Vlaams niveau.
+De analyse slaat telkens op de afgelopen `r params$n_winter` winters.
+Oudere tellingen gebruiken we niet momenteel niet voor deze analyse.
+Verder moeten we van een winterverblijf over minstens 4 winters met een bruikbare telling beschikken om bruikbaar te zijn voor de analyse.
+Een winterverblijf met minder dan 4 winters met tellingen tijdens de afgelopen `r params$n_winter` winters is nog niet bruikbaar.
+Indien meerdere tellingen per winter beschikbaar zijn, dan gebruiken we de telling het dichtst bij 15 januari.
+
+Grote winterverblijven delen we op in meerdere deellocaties.
+Deze deellocaties worden afzonderlijk geteld.
+De waarnemingen hebben we bij voorkeur per deellocatie.
+Soms hebben we enkel het totaal over het volledige winterverblijf beschikbaar.
+Daarom maken we voor de grote winterverblijven in @fig-overzicht-bruikbaar een onderscheid tussen tellingen op detailniveau (per deellocatie) en tellingen op totaalniveau (voor het volledige winterverblijf).
+Hebben we minstens 4 winters met tellingen op detailniveau en het aantal winters met tellingen op detailniveau is groter dan het aantal winters met tellingen op totaalniveau, dan gebruiken we enkel het detailniveau voor de analyse.
+In het andere geval aggregeren we de detailtellingen tot een totaal en gebruiken we deze totalen, samen met de tellingen op totaalniveau, voor de analyse.
+Hebben we meerdere tellingen per winter, dan geven we eerst voorrang aan de tellingen op detailniveau.
+Alternatieve detailtellingen zijn detailtellingen die op minder dan 10 dagen van een bruikbare detailtellingen liggen.
+We kunnen deze tellingen gebruiken indien de bruikbare telling bepaalde deellocaties niet omvat.
+In de praktijk is dit enkel relevant wanneer een telling over meerdere dagen gespreid werd.
+
 ```{r}
-#| label: cap-format
-relevant_cap <- "Beschikbare tellingen van %s in
-[meetnetten.be](https://meetnetten.be) met het totaal aantal getelde vleermuizen
-per telling.
-Het grijze vlak geeft de analyseperiode weer."
+#| label: fig-overzicht-bruikbaar
+#| fig.cap: Overzicht beschikbare tellingen in
+#|   [meetnetten.be](https://www.meetnetten.be)
+#| fig-height: 2
+#| fig-width: 7
+ggplot(visits, aes(x = visit_id, y = 1, fill = detailgraad)) +
+  geom_tile() +
+  scale_x_discrete(labels = visits$date) +
+  theme(
+    axis.title = element_blank(), axis.text.x = element_text(angle = 90),
+    axis.text.y = element_blank(), axis.ticks = element_blank(),
+    panel.grid = element_blank()
+  )
 ```
 
-# Overzicht beschikbare tellingen
+We berekenen een monitoringsscore op basis van de winters met bruikbare tellingen tijdens de afgelopen `r params$n_winter` winters.
+Deze score loopt van 0% tot 100%.
+Een score van 100% betekent dat we van alle afgelopen `r params$n_winter` winters een bruikbare telling hebben.
+Recenter winters krijgen een hogere gewicht in de scoreberekening.
+Op die manier stimuleren we dat winterverblijven regelmatig geteld worden.
+Is het winterverblijf opgedeeld in deellocaties, dan krijgen tellingen op totaalniveau slechts de helft van de score die tellingen op detailniveau krijgen.
+Op die manier stimuleren we om de tellingen op detailniveau in te voeren.
+Vanaf een score van `r sprintf("%.2f%%", 100 * sum(1 / seq_len(18)) / sum(1 / seq_len(24)))` (equivalent met bruikbare tellingen voor alle afgelopen 18 winters), geven we een gouden badge.
+Vanaf een score van `r sprintf("%.2f%%", 100 * sum(1 / seq_len(12)) / sum(1 / seq_len(24)))` (equivalent met bruikbare tellingen voor alle afgelopen 12 winters), geven we een zilveren badge.
+Vanaf een score van `r sprintf("%.2f%%", 100 * sum(1 / seq_len(6)) / sum(1 / seq_len(24)))` (equivalent met bruikbare tellingen voor alle afgelopen 6 winters), geven we een bronzen badge.
+In @fig-overzicht-score geven we de monitoringsscore van dit winterverblijf.
+De score bedraagt `r this_score$tekst`.
+Het winterverblijf staat daarmee op plaats `r this_score$rang`.
 
 ```{r}
-#| label: detailed
-detailed_text1 <- sprintf(
-  "
-Deze winterverplaats is opgedeeld in %i deellocaties.
-Indien de telling per deellocatie beschikbaar is, geven we het percentage
-van de deellocaties dat onderzocht is tijdens de telling.
-Zoniet vermelden we 'enkel totaal'.",
-  relevant_visits$n_sublocations[1]
-)[relevant_visits$n_sublocations[1] > 1]
-detailed_text2 <-
-  "
-Wanneer gedetailleerde tellingen beschikbaar zijn, dan gebruiken we enkel de
-gedetailleerde tellingen wanneer het aantal winters met gedetailleerde tellingen
-groter is dan het aantal winters met enkel totalen en het aantal winters met
-gedetailleerde tellingen minstens 3 is.
-In dat geval houden we rekening met deellocaties die niet onderzocht zijn en
-waar mogelijk vleermuizen aanwezig zijn.
-Zoniet aggregeren we de gedetailleerde tellingen tot een totaal en doen we de
-analyse op basis van de totalen."[relevant_visits$n_sublocations[1] > 1]
-```
-
-In @fig-relevant geven we een overzicht van alle beschikbare tellingen in [meetnetten.be](https://meetnetten.be) <!-- spell-check: ignore -->
-voor het object "`r params$name`".
-Elk punt toont de datum van de telling op de x-as en het totaal aantal getelde vleermuizen op de y-as.`r detailed_text1`
-
-De analyse beschouwt de tellingen van de laatste `r params$n_winter` winters.
-Om relevant te zijn, moeten we tijdens minstens drie verschillende winters vleermuizen aantreffen.`r detailed_text2`
-Indien er meerdere bruikbare tellingen overblijven per winter, kiezen we de telling die het dichtst bij 15 januari valt.
-
-Op basis van de beschikbare tellingen voor de analyse berekenen we een score.
-Deze score ligt tussen 0 en 100 en is hoger wanneer er meer winters met telling zijn en wanneer de tellingen recenter zijn.
-Om de maximale score van 100 te behalen, moet er tijdens alle `r params$n_winter` winters minstens één telling zijn.
-De score voor deze winterverblijfplaats is `r sprintf("%.1f%s", this_score$score, this_score$niveau)`.
-Daarmee behoort ze tot de top `r this_score$rang` van de best onderzochte winterverblijfplaatsen in Vlaanderen van de afgelopen `r params$n_winter` winters.
-
-```{r}
-#| label: fig-relevant
-#| fig-cap: !expr 'sprintf(relevant_cap, params$name)'
-paste0(current_winter - params$n_winter, "-7-15") |>
-  as.Date(format = "%Y-%m-%d") -> start_date
-p <- ggplot(relevant_visits, aes(x = date, y = total)) +
-  geom_ribbon(
-    data = data.frame(date = c(start_date, max_date), total = 0),
-    aes(ymin = -Inf, ymax = Inf), fill = inbo_lichtgrijs, alpha = 0.1
+#| label: fig-overzicht-score
+#| fig.cap: Monitoringsscore op basis van beschikbare tellingen in
+#|   [meetnetten.be](https://www.meetnetten.be).
+#|   Elke rechthoek heeft een breedte die overeenkomt met de score van een
+#|   bepaalde winter.
+#|   Winters zonder bruikbare telling geven we niet weer omdat ze niet bijdragen
+#|   aan de score.
+#| fig-height: 2
+#| fig-width: 7
+badges <- data.frame(
+  score = c(
+    sum(1 / seq_len(6)), sum(1 / seq_len(12)), sum(1 / seq_len(18))
+  ) / sum(1 / seq_len(24)),
+  badge = c("brons", "zilver", "goud"),
+  kleur = c("#8C7853", "#E6E8FA", "#FFD700")
+) |>
+  mutate(score_max = lead(.data$score, 1, 1)) -> badges
+visits |>
+  filter(.data$score > 0) |>
+  distinct(.data$winter, .data$score) |>
+  arrange(desc(.data$winter)) |>
+  mutate(
+    x = cumsum(.data$score),
+    x0 = lag(.data$x, 1, 0),
+    ylab = (row_number() %% 3) / 4 + 0.25
+  ) |>
+  ggplot() +
+  geom_rect(
+    data = badges,
+    aes(xmin = score, xmax = score_max, ymin = -Inf, ymax = Inf, fill = badge)
   ) +
-  scale_shape_manual("in analyse", values = c(ja = 17, nee = 8)) +
-  theme(axis.title = element_blank())
-m_tot <- max(relevant_visits$total)
-if (m_tot <= 10) {
-  p <- p +
-    scale_y_continuous(
-      limits = c(0, m_tot + 1), breaks = seq_len(m_tot + 2) - 1
-    )
-} else {
-  p <- p +
-    scale_y_continuous(limits = c(0, NA))
-}
-if (relevant_visits$n_sublocations[1] > 1) {
-  p +
-    geom_point(aes(color = onderzocht, shape = analyse)) +
-    scale_colour_discrete("onderzochte\ndeellocaties")
-} else {
-  p + geom_point(aes(shape = analyse))
-}
+  geom_rect(aes(xmin = x0, xmax = x, ymin = 0, ymax = 1), fill = NA, colour = inbo_steun_blauw) +
+  geom_label_repel(
+    aes(x = (x + x0) / 2, y = ylab, label = winter),
+    colour = inbo_hoofd,
+    box.padding = unit(0.1, "lines"),
+    min.segment.length = 0.1,
+    max.overlaps = Inf,
+    size = unit(2.5, "lines")
+  ) +
+  geom_label(
+    data = badges,
+    aes(x = (score + score_max) / 2, y = 1.1, label = badge),
+    size = unit(3, "lines")
+  ) +
+  scale_x_continuous(limits = 0:1, labels = percent) +
+  scale_fill_manual(
+    values = setNames(badges$kleur, badges$badge),
+    guide = "none"
+  ) +
+  theme(
+    axis.title = element_blank(), axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(), panel.grid = element_blank()
+  )
+```
+
+```{r}
+#| label: tbl-overzicht-scores
+#| tbl-cap: Overzicht van de monitoringscores van alle winterverblijven in 
+#|   [meetnetten.be](https://www.meetnetten.be).
+scores |>
+  count(.data$badge, name = "aantal") |>
+  arrange(.data$badge) |>
+  kable()
+```
+
+```{r}
+#| eval: !expr '!is.na(visits$level[1])'
+#| results: 'asis'
+"In @fig-overzicht-deellocaties geven we een overzicht van de tellingen op het
+niveau van de deellocaties.
+Op de x-as van de figuur staan de tellingen met hun datum.
+Op de y-as van de figuur staan de deellocaties in alfabetisch volgorde.
+We geven de namen bewust niet mee omdat sommige objecten een zeer groot aantal
+deellocaties hebben.
+Het doel van deze figuur is de niet-getelde deellocaties duidelijk te maken.
+Dit zijn de witte vlakken in de figuur." |>
+  cat()
+```
+
+
+```{r}
+#| label: fig-overzicht-deellocaties
+#| fig.cap: Overzicht van de deellocaties met beschikbare tellingen
+#| fig.height: 9
+#| eval: !expr '!is.na(visits$level[1])'
+file.path("data", "hibernation", "samples") |>
+  verify_vc(root = data_root, variables = c("sublocation_id", "visit_id")) |>
+  left_join(
+    file.path("data", "hibernation", "aggregation") |>
+      verify_vc(root = data_root, variables = c("sublocation_id", "aggregate")),
+    by = "sublocation_id"
+  ) |>
+  mutate(
+    sublocation_id = ifelse(
+      is.na(.data$aggregate), .data$sublocation_id, .data$aggregate
+    ),
+    visit_id = factor(.data$visit_id, levels = levels(visits$visit_id))
+  ) |>
+  distinct(.data$sublocation_id, .data$visit_id) |>
+  inner_join(
+    visits |>
+      select("visit_id", "date", "detailgraad"),
+    by = "visit_id"
+  ) |>
+  inner_join(
+    file.path("data", "hibernation", "locations") |>
+      verify_vc(root = data_root, variables = c("id", "name", "parent_id")) |>
+      filter(.data$parent_id == params$location) |>
+      transmute(sublocation_id = .data$id, name = factor(.data$name)),
+    by = "sublocation_id"
+  ) |>
+  mutate(
+    date = factor(.data$date)
+  ) |>
+  arrange(.data$name) -> missing_sublocation
+ggplot(missing_sublocation, aes(x = date, y = name, fill = detailgraad)) +
+  geom_tile() +
+  theme(
+    axis.title = element_blank(), axis.text.x = element_text(angle = 90),
+    axis.text.y = element_blank(), panel.grid = element_blank()
+  )
 ```
