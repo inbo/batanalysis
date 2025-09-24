@@ -41,7 +41,7 @@ raw_visits |>
         "bijkomend",
       .data$type == "old detail" ~ "oud detail",
       .data$type %in% "old total" ~ "oud totaal",
-      .data$type == "old detail" ~ "oud",
+      .data$type == "old" ~ "oud",
       .data$level == "detail" & .data$type == "detail" ~ "bruikbaar detail",
       .data$level == "mixed" & .data$type == "detail" ~
         "bruikbaar detail als totaal",

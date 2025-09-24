@@ -31,8 +31,16 @@ result_root <- repository(params$result)
 
 ```{r}
 #| label: read-data
-verify_vc("relevant_visit", root = ".", variables = c("location_id")) |> 
-  filter(.data$location_id == params$location, .data$relevant) |>
+verify_vc(
+  "visit_type", root = ".", variables = c("visit_id", "type", "score")
+) |> 
+  filter(.data$location_id == params$location) |>
+  mutate(
+    analyse = (is.na(.data$level) & .data$type == "potential") |
+      .data$level != "rare" & .data$type == "detail" |
+      .data$level == "mixed" & .data$type == "total"
+  ) |>
+  filter(.data$analyse) |>
   slice_max(.data$winter, n = 1) -> relevant
 get_child_species(data_root, "Mmysbra") |>
   transmute(species_id = .data$id, species = "Mmysbra") |>
@@ -49,7 +57,7 @@ file.path("data", "hibernation", "species") |>
     root = data_root, variables = c("id", "code", "name", "scientific_name")
   ) |>
   select(-"parent") -> species
-if (relevant$surveyed_sublocations > 1) {
+if (relevant$type == "detail") {
   file.path("data", "hibernation", "samples") |>
     verify_vc(root = data_root, variables = c("sample_id", "visit_id")) |>
     semi_join(relevant, by = "visit_id") |>
@@ -76,7 +84,24 @@ if (relevant$surveyed_sublocations > 1) {
         summarise(observed = sum(.data$number), .groups = "drop")
     ) -> observed
 } else {
-  stop("total")
+  file.path("data", "hibernation", "totals") |>
+    verify_vc(root = data_root, variables = c("visit_id", "total")) |>
+    semi_join(relevant, by = "visit_id") -> observed
+  observed |>
+    inner_join(combined_species, by = "species_id") |>
+    group_by(.data$species) |>
+    summarise(observed = sum(.data$total), .groups = "drop") |>
+    bind_rows(
+      observed |>
+        anti_join(combined_species, by = "species_id") |>
+        inner_join(
+          species |>
+            select("species_id" = "id", "species" = "code"),
+          by = "species_id"
+        ) |>
+        group_by(.data$species) |>
+        summarise(observed = sum(.data$total), .groups = "drop")
+    ) -> observed
 }
 file.path("hibernation", "total_location") |>
   verify_vc(
@@ -98,7 +123,10 @@ file.path("hibernation", "total_location") |>
     across(starts_with("p"), ~ ifelse(is.na(.x), .data$observed, .x))
   ) |>
   inner_join(species, by = c("species" = "code")) |>
-  mutate(name = reorder(.data$name, .data$p50)) -> recent
+  mutate(
+    name = reorder(.data$name, .data$p50),
+    position = ifelse(.data$p95 < 0.5 * max(.data$p95), -0.2, 1.2)
+  ) -> recent
 ```
 
 ```{r}
@@ -119,10 +147,13 @@ recent |>
   geom_bar(stat = "identity", aes(y = p80), alpha = 0.2) +
   geom_bar(stat = "identity", aes(y = p95), alpha = 0.2) +
   geom_text(
-    aes(y = p95, label = label), hjust = -0.1, vjust = 0.5, size.unit = "pt",
-    size = 6
+    aes(y = p95, label = label, hjust = position, colour = factor(position)),
+    vjust = 0.5, size.unit = "pt", size = 6
   ) +
-  scale_y_continuous(expand = expansion(c(0, 0.2))) +
+  scale_colour_manual(
+    values = c("-0.2" = inbo_steun_blauw, "1.2" = "white"),
+    guide = "none"
+  ) +
   coord_flip() +
   theme(axis.title = element_blank())
 ```
