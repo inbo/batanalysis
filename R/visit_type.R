@@ -1,15 +1,13 @@
 #' Visit Type Classification
 #' @export
 #' @inheritParams prepare_analysis_model_species
-#' @param output_data Path to store the results
 #' @importFrom dplyr bind_rows filter group_by left_join inner_join mutate n
 #' select semi_join transmute ungroup
-#' @importFrom git2rdata verify_vc write_vc
+#' @importFrom git2rdata verify_vc
 #' @importFrom lubridate round_date year
 #' @importFrom rlang .data
 visit_type <- function(
   raw_data,
-  output_data,
   start_winter = as.integer(format(Sys.Date(), "%Y")) - 23,
   n_winter = 4,
   max_delta = 10
@@ -164,12 +162,5 @@ visit_type <- function(
         sum(1 / seq_len(24))
     ) |>
     ungroup() |>
-    bind_rows(non_detailed_visits) |>
-    write_vc(
-      "visit_type",
-      root = output_data,
-      sorting = "visit_id",
-      optimize = FALSE,
-      digits = 4
-    )
+    bind_rows(non_detailed_visits)
 }

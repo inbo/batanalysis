@@ -6,7 +6,6 @@
 \usage{
 visit_type(
   raw_data,
-  output_data,
   start_winter = as.integer(format(Sys.Date(), "\%Y")) - 23,
   n_winter = 4,
   max_delta = 10
@@ -14,8 +13,6 @@ visit_type(
 }
 \arguments{
 \item{raw_data}{The git repository with the raw data}
-
-\item{output_data}{Path to store the results}
 
 \item{start_winter}{The starting winter (year) for the analysis.
 This is the year of first of January.
