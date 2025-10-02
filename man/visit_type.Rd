@@ -7,7 +7,6 @@
 visit_type(
   raw_data,
   start_winter = as.integer(format(Sys.Date(), "\%Y")) - 23,
-  n_winter = 4,
   max_delta = 10
 )
 }
@@ -21,9 +20,6 @@ The default is 23 years before the current year.
 This means that in 2024 the default is 2001.
 This means that the analysis will use data from the winter
 2000-2001 up to the last completed winter.}
-
-\item{n_winter}{Minimum number of winters in which a (sub)location is
-monitored.}
 
 \item{max_delta}{Only relevant in case of multiple visits within the same
 winter to a location divided into sublocation.
