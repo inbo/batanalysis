@@ -7,14 +7,11 @@
 prepare_analysis_model_species(
   raw_data,
   species,
-  start_winter = as.integer(format(Sys.Date(), "\%Y")) - 23,
   base,
   project = "batanalysis",
-  n_winter = 4,
-  n_present = 3,
-  n_extrapolation = 5,
-  max_delta = 10,
+  n_extrapolation = 24,
   max_dist = 10,
+  visits,
   overwrite = FALSE,
   verbose = TRUE
 )
@@ -24,44 +21,9 @@ prepare_analysis_model_species(
 
 \item{species}{the code of the species}
 
-\item{start_winter}{The starting winter (year) for the analysis.
-This is the year of first of January.
-For example, for the winter 2000-2001, use 2001.
-The default is 23 years before the current year.
-This means that in 2024 the default is 2001.
-This means that the analysis will use data from the winter
-2000-2001 up to the last completed winter.}
-
 \item{base}{The base location to store the model.}
 
 \item{project}{Will be a relative path within the base location.}
-
-\item{n_winter}{Minimum number of winters in which a (sub)location is
-monitored.}
-
-\item{n_present}{Minimum number of winters in which the species is observed
-at a (sub)location.}
-
-\item{n_extrapolation}{Maximum number of winters from the nearest winter
-where the species was observed at a (sub)location.
-Only do imputations for a (sub)location when the difference between the
-nearest observed winter and the missing winter is below or equal to this
-threshold.}
-
-\item{max_delta}{Only relevant in case of multiple visits within the same
-winter to a location divided into sublocation.
-We select for every winter per sublocation the visit that is closest to the
-middle of the winter (15th of January).
-All selected visits of a location for a given winter should be within
-\code{max_delta} days from each other.
-If not, we drop the visits the furthest away from the middle of the winter
-until the condition is met.
-This ensures that the visits to the sublocations are not too far apart in
-time.
-The default is 10 days.
-This means that all visits to sublocations of a location should be
-within 10 days from each other.
-This allows to spread the visits over a few days.}
 
 \item{max_dist}{The maximum distance for the range in kilometres}
 
@@ -71,6 +33,10 @@ Defaults to \code{TRUE}.}
 \item{verbose}{A logical.
 When \code{TRUE} print the message.
 When \code{FALSE} do nothing.}
+
+\item{n_extrapolate}{Impute only locations or sublocations when there is no
+more than \code{n_extrapolate} winters between the observation to impute and the
+nearest observation.}
 }
 \description{
 Prepare the analysis models for a single species

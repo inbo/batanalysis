@@ -11,14 +11,17 @@ prepare_analysis_model <- function(
   start_winter = as.integer(format(Sys.Date(), "%Y")) - 23,
   base,
   project = "batanalysis",
-  n_winter = 4,
-  n_present = 3,
-  n_extrapolation = 5,
   max_delta = 10,
+  n_extrapolation = 24,
   max_dist = 10,
   overwrite = FALSE,
   verbose = TRUE
 ) {
+  visit_type(
+    raw_data = raw_data,
+    start_winter = start_winter,
+    max_delta = max_delta
+  ) -> visits
   c(
     "Mbec",
     "Mdas",
@@ -34,15 +37,12 @@ prepare_analysis_model <- function(
       ~ prepare_analysis_model_species(
         species = .x,
         base = base,
+        n_extrapolation = n_extrapolation,
         max_dist = max_dist,
         project = project,
         overwrite = overwrite,
         raw_data = raw_data,
-        start_winter = start_winter,
-        n_winter = n_winter,
-        n_present = n_present,
-        n_extrapolation = n_extrapolation,
-        max_delta = max_delta,
+        visits = visits,
         verbose = verbose
       )
     ) |>

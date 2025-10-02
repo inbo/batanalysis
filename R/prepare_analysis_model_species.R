@@ -3,36 +3,9 @@
 #' @inheritParams n2kanalysis::display
 #' @param raw_data The git repository with the raw data
 #' @param species the code of the species
-#' @param start_winter The starting winter (year) for the analysis.
-#' This is the year of first of January.
-#' For example, for the winter 2000-2001, use 2001.
-#' The default is 23 years before the current year.
-#' This means that in 2024 the default is 2001.
-#' This means that the analysis will use data from the winter
-#' 2000-2001 up to the last completed winter.
-#' @param n_winter Minimum number of winters in which a (sub)location is
-#' monitored.
-#' @param n_present Minimum number of winters in which the species is observed
-#' at a (sub)location.
-#' @param n_extrapolation Maximum number of winters from the nearest winter
-#' where the species was observed at a (sub)location.
-#' Only do imputations for a (sub)location when the difference between the
-#' nearest observed winter and the missing winter is below or equal to this
-#' threshold.
-#' @param max_delta Only relevant in case of multiple visits within the same
-#' winter to a location divided into sublocation.
-#' We select for every winter per sublocation the visit that is closest to the
-#' middle of the winter (15th of January).
-#' All selected visits of a location for a given winter should be within
-#' `max_delta` days from each other.
-#' If not, we drop the visits the furthest away from the middle of the winter
-#' until the condition is met.
-#' This ensures that the visits to the sublocations are not too far apart in
-#' time.
-#' The default is 10 days.
-#' This means that all visits to sublocations of a location should be
-#' within 10 days from each other.
-#' This allows to spread the visits over a few days.
+#' @param n_extrapolate Impute only locations or sublocations when there is no
+#' more than `n_extrapolate` winters between the observation to impute and the
+#' nearest observation.
 #' @param max_dist The maximum distance for the range in kilometres
 #' @export
 #' @importFrom dplyr bind_rows distinct filter inner_join left_join mutate
@@ -40,27 +13,21 @@
 #' @importFrom git2rdata recent_commit verify_vc
 #' @importFrom n2kanalysis display n2k_aggregate n2k_hurdle_imputed
 #' n2k_model_imputed n2k_spde spde store_model
-#' @importFrom rlang .data
-#' @importFrom sf st_as_sf st_coordinates st_transform
+#' @importFrom rlang .data sym
+#' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
 #' @importFrom stats poly
+#' @importFrom tidyr complete nesting replace_na
 prepare_analysis_model_species <- function(
   raw_data,
   species,
-  start_winter = as.integer(format(Sys.Date(), "%Y")) - 23,
   base,
   project = "batanalysis",
-  n_winter = 4,
-  n_present = 3,
-  n_extrapolation = 5,
-  max_delta = 10,
+  n_extrapolation = 24,
   max_dist = 10,
+  visits,
   overwrite = FALSE,
   verbose = TRUE
 ) {
-  assert_that(is.count(start_winter), noNA(start_winter))
-  sprintf("%i-10-01", start_winter - 1) |>
-    as.Date() -> start
-
   # prepare species information
   get_child_species(target = raw_data, species = species) |>
     inner_join(
@@ -74,162 +41,191 @@ prepare_analysis_model_species <- function(
     display(verbose = verbose)
 
   # prepare location information
-  file.path("data", "hibernation", "locations") |>
-    verify_vc(
-      root = raw_data,
-      variables = c("id", "longitude", "latitude", "parent_id")
-    ) -> all_locations
-  all_locations |>
-    filter(.data$parent_id < 0) |>
-    select(location_id = "id", "longitude", "latitude") |>
-    left_join(
-      all_locations |>
-        filter(.data$parent_id > 0) |>
-        distinct(location_id = .data$parent_id, detailed = TRUE),
-      by = "location_id"
+  visits |>
+    filter(.data$type %in% c("detail", "total")) |>
+    distinct(
+      .data$location_id,
+      detailed = !is.na(.data$level)
+    ) |>
+    inner_join(
+      file.path("data", "hibernation", "locations") |>
+        verify_vc(
+          root = raw_data,
+          variables = c("id", "longitude", "latitude", "parent_id")
+        ),
+      by = c("location_id" = "id")
     ) |>
     left_join(
       file.path("data", "hibernation", "location_types") |>
         verify_vc(root = raw_data, c("location_id", "type")),
       by = "location_id"
     ) |>
-    mutate(
-      detailed = replace_na(.data$detailed, FALSE),
+    transmute(
+      .data$location_id,
+      .data$longitude,
+      .data$latitude,
+      .data$detailed,
       type = replace_na(.data$type, "small")
     ) |>
     st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
     st_transform(crs = 31370) -> locations
   locations |>
     st_coordinates() |>
-    bind_cols(locations) |>
+    bind_cols(st_drop_geometry(locations)) |>
     mutate(across(c("X", "Y"), ~ . / 1000)) -> locations
 
-  display(verbose = verbose, "  preparing timeseries without detail")
-  no_detail <- select_imputation_no_detail(
-    locations = locations,
-    raw_data = raw_data,
-    this_species = this_species,
-    start = start,
-    n_winter = n_winter,
-    n_present = n_present,
-    n_extrapolation = n_extrapolation
-  )
-
-  display(verbose = verbose, "  preparing detailed timeseries")
-  detail <- select_imputation_detail(
-    locations = locations,
-    raw_data = raw_data,
-    this_species = this_species,
-    start = start,
-    n_winter = n_winter,
-    n_present = n_present,
-    n_extrapolation = n_extrapolation,
-    max_delta = max_delta
-  )
-
-  display(verbose = verbose, "  preparing analysis objects")
-  # calculate polynomial coefficients for winter
-  bind_rows(detail$sublocation, detail$location, no_detail) |>
-    inner_join(locations, by = "location_id") -> dataset
-  dataset |>
-    filter(.data$number > 0) |>
-    distinct(.data$winter) |>
-    complete(winter = min(.data$winter):(max(.data$winter) + 1)) |>
-    mutate(
-      winter_r = .data$winter - min(.data$winter) + 1,
-      winter_l = poly(.data$winter, 3)[, 1] |>
-        zapsmall(),
-      winter_q = poly(.data$winter, 3)[, 2] |>
-        zapsmall(),
-      winter_c = poly(.data$winter, 3)[, 3] |>
-        zapsmall()
-    ) -> poly_winter
-  dataset |>
-    inner_join(poly_winter, by = "winter") |>
+  display(verbose = verbose, "  preparing data")
+  file.path("data", "hibernation", "totals") |>
+    verify_vc(
+      root = raw_data,
+      variables = c("visit_id", "species_id", "total")
+    ) |>
+    semi_join(this_species, by = c("species_id" = "id")) |>
+    group_by(.data$visit_id) |>
+    summarise(number = sum(.data$total), .groups = "drop") |>
+    left_join(
+      x = visits |>
+        filter(
+          .data$type == "total",
+          is.na(.data$level) | .data$level != "detail"
+        ),
+      by = "visit_id"
+    ) |>
     transmute(
+      observation_id = .data$visit_id,
+      datafield_id = 2L,
+      .data$location_id,
+      .data$winter,
+      number = replace_na(.data$number, 0)
+    ) |>
+    group_by(.data$location_id) |>
+    filter(max(.data$number, na.rm = TRUE) > 0) |>
+    ungroup() -> totals
+  file.path("data", "hibernation", "observations") |>
+    verify_vc(
+      root = raw_data,
+      variables = c("sample_id", "species_id", "number")
+    ) |>
+    semi_join(this_species, by = c("species_id" = "id")) |>
+    group_by(.data$sample_id) |>
+    summarise(number = sum(.data$number), .groups = "drop") |>
+    left_join(
+      x = file.path("data", "hibernation", "samples") |>
+        verify_vc(
+          root = raw_data,
+          variables = c("sample_id", "visit_id", "sublocation_id")
+        ),
+      by = "sample_id"
+    ) |>
+    left_join(
+      file.path("data", "hibernation", "aggregation") |>
+        verify_vc(
+          root = raw_data,
+          variables = c("sublocation_id", "aggregate")
+        ),
+      by = "sublocation_id"
+    ) |>
+    mutate(
+      sublocation_id = ifelse(
+        is.na(.data$aggregate),
+        .data$sublocation_id,
+        .data$aggregate
+      )
+    ) |>
+    group_by(.data$visit_id, .data$sublocation_id) |>
+    summarise(
+      sample_id = min(.data$sample_id),
+      number = sum(.data$number, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    left_join(
+      x = visits |>
+        filter(.data$type == "detail"),
+      by = "visit_id"
+    ) |>
+    transmute(
+      observation_id = ifelse(
+        .data$level == "detail",
+        .data$sample_id,
+        .data$visit_id
+      ),
+      datafield_id = ifelse(.data$level == "detail", 1L, 2L),
+      .data$location_id,
+      .data$sublocation_id,
+      .data$winter,
+      .data$level,
+      number = replace_na(.data$number, 0)
+    ) |>
+    group_by(.data$sublocation_id) |>
+    filter(max(.data$number, na.rm = TRUE) > 0) |>
+    ungroup() -> details
+  details |>
+    filter(.data$level == "mixed") |>
+    group_by(
       .data$observation_id,
       .data$datafield_id,
-      present = as.integer(.data$number > 0),
-      number = ifelse(.data$number > 0, .data$number, NA_integer_),
-      location = factor(.data$location_id),
-      sublocation = factor(.data$sublocation_id),
-      # define the type of location
-      fortress = as.integer(.data$type == "fortress"),
-      marl_quarry = as.integer(.data$type == "marl quarry"),
-      other_large = as.integer(.data$type == "other large"),
-      small = as.integer(.data$type == "small"),
-      # centre winter to the starting year
-      .data$winter,
-      .data$winter_r,
-      # linear polynomial coefficient for winter
-      location_l = .data$location,
-      sublocation_l = .data$sublocation,
-      .data$winter_l,
-      # quadratic polynomial coefficient for winter
-      location_q = .data$location,
-      sublocation_q = .data$sublocation,
-      .data$winter_q,
-      # cubic polynomial coefficient for winter
-      location_c = .data$location,
-      sublocation_c = .data$sublocation,
-      .data$winter_c,
-      .data$X,
-      .data$Y
-    ) -> dataset
-  dataset |>
-    group_by(.data$sublocation) |>
-    mutate(
-      n_winter = n_distinct(.data$winter_c[!is.na(.data$present)]),
-      subwinter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA_real_),
-      subwinter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA_real_),
-      subwinter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA_real_)
+      .data$location_id,
+      .data$winter
     ) |>
-    group_by(.data$location) |>
-    mutate(
-      n_winter = n_distinct(.data$winter_c[!is.na(.data$present)]),
-      winter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA_real_),
-      winter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA_real_),
-      winter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA_real_)
+    summarise(number = sum(.data$number), .groups = "drop") |>
+    bind_rows(totals) -> relevant_totals
+  if (nrow(relevant_totals) > 0) {
+    relevant_totals |>
+      complete(
+        .data$location_id,
+        winter = min(.data$winter):(max(.data$winter) + 1)
+      ) -> relevant_totals
+  }
+  details |>
+    filter(.data$level == "detail") |>
+    select(-"level") |>
+    complete(
+      nesting(!!sym("location_id"), !!sym("sublocation_id")),
+      winter = min(.data$winter):(max(.data$winter) + 1)
     ) |>
-    ungroup() |>
-    select(-"n_winter", -"number") -> ds_present
-  dataset |>
-    group_by(.data$sublocation) |>
     mutate(
-      n_winter = n_distinct(.data$winter_c[!is.na(.data$number)]),
-      subwinter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA_real_),
-      subwinter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA_real_),
-      subwinter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA_real_)
+      observation_id = ifelse(
+        is.na(.data$observation_id),
+        -1000000L * .data$winter - .data$sublocation_id,
+        .data$observation_id
+      ),
+      datafield_id = replace_na(.data$datafield_id, 3L)
     ) |>
-    group_by(.data$location) |>
-    mutate(
-      n_winter = n_distinct(.data$winter_c[!is.na(.data$number)]),
-      winter_l = ifelse(.data$n_winter >= 6, .data$winter_l, NA_real_),
-      winter_q = ifelse(.data$n_winter >= 12, .data$winter_q, NA_real_),
-      winter_c = ifelse(.data$n_winter >= 18, .data$winter_c, NA_real_)
+    bind_rows(
+      relevant_totals |>
+        mutate(
+          observation_id = ifelse(
+            is.na(.data$observation_id),
+            -1000000L * .data$winter - .data$location_id,
+            .data$observation_id
+          ),
+          datafield_id = replace_na(.data$datafield_id, 4L)
+        )
+    ) -> full_dataset
+  full_dataset |>
+    filter(.data$number > 0) |>
+    select("location_id", "sublocation_id", reference = "winter") |>
+    inner_join(
+      full_dataset |>
+        filter(is.na(.data$number)),
+      by = c("location_id", "sublocation_id"),
+      relationship = "many-to-many"
     ) |>
-    ungroup() |>
-    mutate(observation_id = as.integer(.data$observation_id)) |>
-    select(-"n_winter", -"present") -> ds_number
-  detail$rare_sublocations |>
-    inner_join(poly_winter, by = "winter") |>
-    mutate(
-      location = factor(.data$location_id, levels = levels(ds_number$location)),
-      sublocation = factor(NA, levels = levels(ds_number$sublocation)),
-      location_l = .data$location,
-      location_q = .data$location,
-      location_c = .data$location,
-      sublocation_l = .data$sublocation,
-      sublocation_q = .data$sublocation,
-      sublocation_c = .data$sublocation
-    ) -> extra
-  missing_cols <- colnames(ds_number)[!colnames(ds_number) %in% colnames(extra)]
-  list(NA_real_) |>
-    rep(length(missing_cols)) |>
-    setNames(missing_cols) |>
-    as.data.frame() |>
-    bind_cols(extra) -> extra
+    slice_min(
+      abs(.data$winter - .data$reference),
+      n = 1,
+      with_ties = FALSE,
+      by = c("location_id", "sublocation_id", "winter")
+    ) |>
+    filter(abs(.data$winter - .data$reference) <= n_extrapolation) |>
+    bind_rows(
+      full_dataset |>
+        filter(!is.na(.data$number))
+    ) |>
+    inner_join(locations, by = "location_id") -> dataset
 
+  display(verbose = verbose, "  preparing analysis objects")
+  # calculate analysis date
   file.path("data", "hibernation", "locations") |>
     recent_commit(root = raw_data, data = TRUE) |>
     bind_rows(
@@ -246,11 +242,86 @@ prepare_analysis_model_species <- function(
     ) |>
     slice_max(.data$when, n = 1, with_ties = FALSE) |>
     distinct() -> rc
-
-  # prepare spde object
+  # prepare SPDE object
   locations |>
     select(c("X", "Y")) |>
     spde(range = c(max_dist, 0.9), sigma = c(1, 0.01)) -> spde
+
+  # calculate polynomial coefficients for winter
+  dataset |>
+    distinct(.data$winter) |>
+    mutate(
+      winter_r = .data$winter - min(.data$winter) + 1,
+      winter_l = poly(.data$winter, 3)[, 1] |>
+        zapsmall(),
+      winter_q = poly(.data$winter, 3)[, 2] |>
+        zapsmall(),
+      winter_c = poly(.data$winter, 3)[, 3] |>
+        zapsmall()
+    ) -> poly_winter
+  dataset |>
+    inner_join(poly_winter, by = "winter") |>
+    transmute(
+      .data$observation_id,
+      .data$datafield_id,
+      .data$number,
+      .data$X,
+      .data$Y,
+      .data$location_id,
+      # define the type of location
+      .data$type,
+      fortress = as.integer(.data$type == "fortress"),
+      marl_quarry = as.integer(.data$type == "marl quarry"),
+      other_large = as.integer(.data$type == "other large"),
+      small = as.integer(.data$type == "small"),
+      .data$sublocation_id,
+      location_i = factor(.data$location_id),
+      sublocation_i = factor(.data$sublocation_id),
+      # centre winter to the starting year
+      .data$winter,
+      winter_i = .data$winter - min(.data$winter) + 1,
+      .data$winter_l,
+      .data$winter_q,
+      .data$winter_c
+    ) -> dataset
+  display(verbose = verbose, "    presence")
+  dataset |>
+    group_by(.data$sublocation_id) |>
+    mutate(
+      present = as.integer(.data$number > 0),
+      n_subloc = sum(.data$present == 0, na.rm = TRUE) |>
+        pmin(sum(.data$present == 1, na.rm = TRUE)),
+      n_subloc = ifelse(is.na(.data$sublocation_id), 0, .data$n_subloc),
+      sublocation_l = ifelse(.data$n_subloc >= 3, .data$sublocation_id, NA) |>
+        factor(levels = levels(.data$sublocation_i)),
+      subwinter_l = ifelse(.data$n_subloc >= 3, .data$winter_l, NA_real_),
+      sublocation_q = ifelse(.data$n_subloc >= 6, .data$sublocation_id, NA) |>
+        factor(levels = levels(.data$sublocation_i)),
+      subwinter_q = ifelse(.data$n_subloc >= 6, .data$winter_l, NA_real_),
+      sublocation_c = ifelse(.data$n_subloc >= 9, .data$sublocation_id, NA) |>
+        factor(levels = levels(.data$sublocation_i)),
+      subwinter_c = ifelse(.data$n_subloc >= 9, .data$winter_c, NA_real_)
+    ) |>
+    ungroup() -> ds_present
+  ds_present |>
+    filter(!is.na(.data$present)) |>
+    group_by(.data$location_id, .data$winter) |>
+    summarise(n_loc = mean(.data$present), .groups = "drop_last") |>
+    summarise(n_loc = sum(.data$n_loc), n = n()) |>
+    transmute(.data$location_id, n_loc = pmin(.data$n_loc, n - .data$n_loc)) |>
+    inner_join(ds_present, by = "location_id") |>
+    mutate(
+      location_l = ifelse(.data$n_loc >= 3, .data$location_id, NA) |>
+        factor(levels = levels(.data$location_i)),
+      winter_l = ifelse(.data$n_loc >= 3, .data$winter_l, NA_real_),
+      location_q = ifelse(.data$n_loc >= 6, .data$location_id, NA) |>
+        factor(levels = levels(.data$location_i)),
+      winter_q = ifelse(.data$n_loc >= 6, .data$winter_q, NA_real_),
+      location_c = ifelse(.data$n_loc >= 9, .data$location_id, NA) |>
+        factor(levels = levels(.data$location_i)),
+      winter_c = ifelse(.data$n_loc >= 9, .data$winter_c, NA_real_)
+    ) |>
+    select(-"n_loc", -"n_subloc", -"number", -"type") -> ds_present
   presence <- n2k_spde(
     formula = paste(
       "present ~ 0",
@@ -264,19 +335,19 @@ prepare_analysis_model_species <- function(
         collapse = " +\n"
       ),
       "f(
-        winter_r,
+        winter_i,
         model = \"rw1\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.15, 0.05)))
       ) +
       f(
-        sublocation,
+        sublocation_i,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
       )",
       paste(
         c(
           "      f(
-        location,
+        location_i,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
       ) +
@@ -291,31 +362,34 @@ prepare_analysis_model_species <- function(
         winter_q,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-      ) +
-      f(
+      )"[length(unique(ds_present$location_id)) > 1],
+          "      f(
         location_c,
         winter_c,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-      )"[length(unique(ds_present$location)) > 1],
+      )"[
+            length(unique(ds_present$location_id)) > 1 &&
+              any(!is.na(ds_present$location_c))
+          ],
           "f(
         sublocation_l,
         subwinter_l,
         model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )"[any(!is.na(ds_present$subwinter_l))],
+        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
+      )"[any(!is.na(ds_present$sublocation_l))],
           "f(
         sublocation_q,
         subwinter_q,
         model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )"[any(!is.na(ds_present$subwinter_q))],
+        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
+      )"[any(!is.na(ds_present$sublocation_q))],
           "f(
         sublocation_c,
         subwinter_c,
         model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )"[any(!is.na(ds_present$subwinter_c))]
+        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
+      )"[any(!is.na(ds_present$sublocation_c))]
         ),
         collapse = " +\n"
       ),
@@ -338,6 +412,44 @@ prepare_analysis_model_species <- function(
   )
   store_model(presence, base = base, project = project, overwrite = overwrite)
 
+  display(verbose = verbose, "    number when present")
+  dataset |>
+    group_by(.data$sublocation_id) |>
+    mutate(
+      n_subloc = ifelse(
+        is.na(.data$sublocation_id),
+        0,
+        sum(.data$number > 0, na.rm = TRUE)
+      ),
+      number = ifelse(.data$number > 0, .data$number, NA_integer_),
+      sublocation_l = ifelse(.data$n_subloc >= 6, .data$sublocation_id, NA) |>
+        factor(levels = levels(.data$sublocation_i)),
+      subwinter_l = ifelse(.data$n_subloc >= 6, .data$winter_l, 0),
+      sublocation_q = ifelse(.data$n_subloc >= 12, .data$sublocation_id, NA) |>
+        factor(levels = levels(.data$sublocation_i)),
+      subwinter_q = ifelse(.data$n_subloc >= 12, .data$winter_l, 0),
+      sublocation_c = ifelse(.data$n_subloc >= 18, .data$sublocation_id, NA) |>
+        factor(levels = levels(.data$sublocation_i)),
+      subwinter_c = ifelse(.data$n_subloc >= 18, .data$winter_c, 0)
+    ) |>
+    ungroup() -> ds_number
+  ds_number |>
+    filter(.data$number > 0) |>
+    distinct(.data$location_id, .data$winter) |>
+    count(.data$location_id, name = "n_loc") |>
+    inner_join(ds_number, by = "location_id") |>
+    mutate(
+      location_l = ifelse(.data$n_loc >= 6, .data$location_id, NA) |>
+        factor(levels = levels(.data$location_i)),
+      winter_l = ifelse(.data$n_loc >= 6, .data$winter_l, 0),
+      location_q = ifelse(.data$n_loc >= 12, .data$location_id, NA) |>
+        factor(levels = levels(.data$location_i)),
+      winter_q = ifelse(.data$n_loc >= 12, .data$winter_q, 0),
+      location_c = ifelse(.data$n_loc >= 18, .data$location_id, NA) |>
+        factor(levels = levels(.data$location_i)),
+      winter_c = ifelse(.data$n_loc >= 18, .data$winter_c, 0)
+    ) |>
+    select(-"n_loc", -"n_subloc") -> ds_number
   count <- n2k_spde(
     formula = paste(
       "number ~ 0",
@@ -352,19 +464,19 @@ prepare_analysis_model_species <- function(
       ),
 
       "f(
-        winter_r,
+        winter_i,
         model = \"rw1\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.15, 0.05)))
       )",
       "f(
-        sublocation,
+        sublocation_i,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
       )",
       paste(
         c(
           "f(
-        location,
+        location_i,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
       ) +
@@ -379,31 +491,34 @@ prepare_analysis_model_species <- function(
         winter_q,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-      ) +
-      f(
+      )"[length(unique(ds_number$location_id)) > 1],
+          "f(
         location_c,
         winter_c,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-      )"[length(unique(ds_number$location)) > 1],
+      )"[
+            length(unique(ds_number$location_id)) > 1 &&
+              any(!is.na(ds_number$location_c))
+          ],
           "f(
         sublocation_l,
         subwinter_l,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )"[any(!is.na(ds_number$subwinter_l))],
+      )"[any(!is.na(ds_number$sublocation_l))],
           "f(
         sublocation_q,
         subwinter_q,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )"[any(!is.na(ds_number$subwinter_q))],
+      )"[any(!is.na(ds_number$sublocation_q))],
           "f(
         sublocation_c,
         subwinter_c,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )"[any(!is.na(ds_number$subwinter_c))]
+      )"[any(!is.na(ds_number$sublocation_c))]
         ),
         collapse = " +\n"
       ),
@@ -421,7 +536,6 @@ prepare_analysis_model_species <- function(
     spde = spde,
     location_group_id = "Flanders",
     seed = 19911204,
-    extra = extra,
     spde_prior = list(range = c(max_dist, 0.01), sigma = c(1, 0.01)),
     first_imported_year = min(dataset$winter),
     analysis_date = rc$when,
@@ -436,17 +550,20 @@ prepare_analysis_model_species <- function(
   store_model(count, base = base, project = project, overwrite = overwrite)
 
   # combine the models into a hurdle model
+  display(verbose = verbose, "    dependend models")
   hurdle <- n2k_hurdle_imputed(presence = presence, count = count)
   store_model(hurdle, base = base, project = project, overwrite = overwrite)
 
-  # create the aggregation by winter
-  aggregated_tot <- n2k_aggregate(
+  # create the aggregate by winter and location
+  aggregated_location <- n2k_aggregate(
     result_datasource_id = hurdle@AnalysisMetadata$result_datasource_id,
     scheme_id = hurdle@AnalysisMetadata$scheme_id,
     species_group_id = hurdle@AnalysisMetadata$species_group_id,
     location_group_id = hurdle@AnalysisMetadata$location_group_id,
-    model_type = "aggregate imputed: sum ~ winter",
-    formula = "~winter",
+    model_type = "aggregate imputed: sum ~ winter + type + location",
+    formula = paste(
+      "~winter + fortress + marl_quarry + other_large + small + location_id"
+    ),
     fun = sum,
     status = "waiting",
     parent = hurdle@AnalysisMetadata$file_fingerprint,
@@ -455,6 +572,61 @@ prepare_analysis_model_species <- function(
     duration = hurdle@AnalysisMetadata$duration,
     last_analysed_year = hurdle@AnalysisMetadata$last_analysed_year,
     analysis_date = hurdle@AnalysisMetadata$analysis_date
+  )
+  store_model(
+    aggregated_location,
+    base = base,
+    project = project,
+    overwrite = overwrite
+  )
+
+  # aggregate by type
+  # fmt: skip
+  aggregated_type <- n2k_aggregate(
+    result_datasource_id =
+      aggregated_location@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_location@AnalysisMetadata$scheme_id,
+    species_group_id = aggregated_location@AnalysisMetadata$species_group_id,
+    location_group_id = aggregated_location@AnalysisMetadata$location_group_id,
+    model_type = "aggregate imputed: sum ~ winter + type",
+    formula = "~winter + fortress + marl_quarry + other_large + small",
+    fun = sum,
+    status = "waiting",
+    parent = aggregated_location@AnalysisMetadata$file_fingerprint,
+    first_imported_year =
+      aggregated_location@AnalysisMetadata$first_imported_year,
+    last_imported_year =
+      aggregated_location@AnalysisMetadata$last_imported_year,
+    duration = aggregated_location@AnalysisMetadata$duration,
+    last_analysed_year =
+      aggregated_location@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_location@AnalysisMetadata$analysis_date
+  )
+  store_model(
+    aggregated_type,
+    base = base,
+    project = project,
+    overwrite = overwrite
+  )
+
+  # create the aggregation by winter
+  # fmt: skip
+  aggregated_tot <- n2k_aggregate(
+    result_datasource_id =
+      aggregated_type@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_type@AnalysisMetadata$scheme_id,
+    species_group_id = aggregated_type@AnalysisMetadata$species_group_id,
+    location_group_id = aggregated_type@AnalysisMetadata$location_group_id,
+    model_type = "aggregate imputed: sum ~ winter",
+    formula = "~winter",
+    fun = sum,
+    status = "waiting",
+    parent = aggregated_type@AnalysisMetadata$file_fingerprint,
+    first_imported_year = aggregated_type@AnalysisMetadata$first_imported_year,
+    last_imported_year = aggregated_type@AnalysisMetadata$last_imported_year,
+    duration = aggregated_type@AnalysisMetadata$duration,
+    last_analysed_year = aggregated_type@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_type@AnalysisMetadata$analysis_date
   )
   store_model(
     aggregated_tot,
@@ -581,54 +753,6 @@ prepare_analysis_model_species <- function(
   )
   store_model(
     total_index,
-    base = base,
-    project = project,
-    overwrite = overwrite
-  )
-
-  # aggregate by type
-  aggregated_type <- n2k_aggregate(
-    result_datasource_id = hurdle@AnalysisMetadata$result_datasource_id,
-    scheme_id = hurdle@AnalysisMetadata$scheme_id,
-    species_group_id = hurdle@AnalysisMetadata$species_group_id,
-    location_group_id = hurdle@AnalysisMetadata$location_group_id,
-    model_type = "aggregate imputed: sum ~ winter + type",
-    formula = "~winter + fortress + marl_quarry + other_large + small",
-    fun = sum,
-    status = "waiting",
-    parent = hurdle@AnalysisMetadata$file_fingerprint,
-    first_imported_year = hurdle@AnalysisMetadata$first_imported_year,
-    last_imported_year = hurdle@AnalysisMetadata$last_imported_year,
-    duration = hurdle@AnalysisMetadata$duration,
-    last_analysed_year = hurdle@AnalysisMetadata$last_analysed_year,
-    analysis_date = hurdle@AnalysisMetadata$analysis_date
-  )
-  store_model(
-    aggregated_type,
-    base = base,
-    project = project,
-    overwrite = overwrite
-  )
-
-  # create the aggregate by winter and location
-  aggregated_location <- n2k_aggregate(
-    result_datasource_id = hurdle@AnalysisMetadata$result_datasource_id,
-    scheme_id = hurdle@AnalysisMetadata$scheme_id,
-    species_group_id = hurdle@AnalysisMetadata$species_group_id,
-    location_group_id = hurdle@AnalysisMetadata$location_group_id,
-    model_type = "aggregate imputed: sum ~ winter + location",
-    formula = "~winter + location",
-    fun = sum,
-    status = "waiting",
-    parent = hurdle@AnalysisMetadata$file_fingerprint,
-    first_imported_year = hurdle@AnalysisMetadata$first_imported_year,
-    last_imported_year = hurdle@AnalysisMetadata$last_imported_year,
-    duration = hurdle@AnalysisMetadata$duration,
-    last_analysed_year = hurdle@AnalysisMetadata$last_analysed_year,
-    analysis_date = hurdle@AnalysisMetadata$analysis_date
-  )
-  store_model(
-    aggregated_location,
     base = base,
     project = project,
     overwrite = overwrite
