@@ -115,6 +115,16 @@ extract_results.character <- function(
   }
   if (random) {
     manifest <- sample(manifest)
+  } else {
+    file.path(base, project) |>
+      list.files(pattern = ".rds$", full.names = TRUE, recursive = TRUE) |>
+      grepv(pattern = "converged") |>
+      file.info() |>
+      arrange(.data$size) |>
+      rownames() |>
+      basename() |>
+      gsub(pattern = ".rds$", replacement = "") -> to_do
+    to_do[to_do %in% manifest] -> manifest
   }
   for (i in manifest) {
     message(i)
@@ -481,7 +491,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
       names_to = "imputation",
       values_to = "total"
     ) -> results
-  if (has_name(results, "location")) {
+  if (has_name(results, "location_id")) {
     results |>
       group_by(.data$winter, .data$imputation) |>
       summarise(
@@ -489,7 +499,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
         .groups = "drop"
       ) |>
       inner_join(results, by = c("winter", "imputation")) |>
-      mutate(total = .data$total / .data$flanders) -> combined
+      mutate(fraction = .data$total / .data$flanders) -> combined
     x@AnalysisMetadata |>
       select(
         species = "species_group_id",
@@ -501,7 +511,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
         combined |>
           group_by(.data$winter, .data$imputation) |>
           mutate(rank = rank(-.data$total, ties.method = "first")) |>
-          group_by(.data$winter, .data$location) |>
+          group_by(.data$winter, .data$location_id) |>
           summarise(
             mean = mean(.data$rank, na.rm = TRUE),
             min = min(.data$rank, na.rm = TRUE),
@@ -514,15 +524,20 @@ extract_results.n2kAggregate <- function(x, root, ...) {
             p95 = quantile(.data$rank, 0.95, na.rm = TRUE),
             max = max(.data$rank, na.rm = TRUE),
             .groups = "drop"
-          ) |>
-          mutate(location = as.integer(levels(.data$location))[.data$location])
+          )
       ) |>
       write_vc(
         file = file.path("hibernation", "rank_location"),
         root = root,
         optimize = FALSE,
         append = TRUE,
-        sorting = c("model_type", "species", "winter", "location", "analysis"),
+        sorting = c(
+          "model_type",
+          "species",
+          "winter",
+          "location_id",
+          "analysis"
+        ),
         digits = 6
       )
     update_metadata(
@@ -544,7 +559,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
         analysis = "The file fingerprint of the analysis",
         fingerprint = "The status fingerprint of the analysis",
         winter = "The winter season defined by the year in which January falls",
-        location = "The unique identifier of the location",
+        location_id = "The unique identifier of the location",
         mean = "The average of rank",
         min = "The minimum rank",
         p05 = "The 5% quantile of the rank",
@@ -566,28 +581,33 @@ extract_results.n2kAggregate <- function(x, root, ...) {
       ) |>
       bind_cols(
         combined |>
-          group_by(.data$winter, .data$location) |>
+          group_by(.data$winter, .data$location_id) |>
           summarise(
-            mean = mean(.data$total, na.rm = TRUE),
-            min = min(.data$total, na.rm = TRUE),
-            p05 = quantile(.data$total, 0.05, na.rm = TRUE),
-            p20 = quantile(.data$total, 0.2, na.rm = TRUE),
-            p35 = quantile(.data$total, 0.35, na.rm = TRUE),
-            p50 = quantile(.data$total, 0.5, na.rm = TRUE),
-            p65 = quantile(.data$total, 0.65, na.rm = TRUE),
-            p80 = quantile(.data$total, 0.8, na.rm = TRUE),
-            p95 = quantile(.data$total, 0.95, na.rm = TRUE),
+            mean = mean(.data$fraction, na.rm = TRUE),
+            min = min(.data$fraction, na.rm = TRUE),
+            p05 = quantile(.data$fraction, 0.05, na.rm = TRUE),
+            p20 = quantile(.data$fraction, 0.2, na.rm = TRUE),
+            p35 = quantile(.data$fraction, 0.35, na.rm = TRUE),
+            p50 = quantile(.data$fraction, 0.5, na.rm = TRUE),
+            p65 = quantile(.data$fraction, 0.65, na.rm = TRUE),
+            p80 = quantile(.data$fraction, 0.8, na.rm = TRUE),
+            p95 = quantile(.data$fraction, 0.95, na.rm = TRUE),
             max = max(.data$total, na.rm = TRUE),
             .groups = "drop"
-          ) |>
-          mutate(location = as.integer(levels(.data$location))[.data$location])
+          )
       ) |>
       write_vc(
         file = file.path("hibernation", "fraction_location"),
         root = root,
         optimize = FALSE,
         append = TRUE,
-        sorting = c("model_type", "species", "winter", "location", "analysis"),
+        sorting = c(
+          "model_type",
+          "species",
+          "winter",
+          "location_id",
+          "analysis"
+        ),
         digits = 6
       )
     update_metadata(
@@ -613,7 +633,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
         analysis = "The file fingerprint of the analysis",
         fingerprint = "The status fingerprint of the analysis",
         winter = "The winter season defined by the year in which January falls",
-        location = "The unique identifier of the location",
+        location_id = "The unique identifier of the location",
         mean = "The average of the imputed total number of hibernating bats",
         min = "The minimum of the imputed total number of hibernating bats",
         p05 = "The 5% quantile of the imputed total number of hibernating bats",
@@ -648,10 +668,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
       ) |>
       bind_cols(
         results |>
-          group_by(
-            winter = .data$winter,
-            location = .data$location
-          ) |>
+          group_by(.data$winter, .data$location_id) |>
           summarise(
             mean = mean(.data$total, na.rm = TRUE),
             min = min(.data$total, na.rm = TRUE),
@@ -664,15 +681,20 @@ extract_results.n2kAggregate <- function(x, root, ...) {
             p95 = quantile(.data$total, 0.95, na.rm = TRUE),
             max = max(.data$total, na.rm = TRUE),
             .groups = "drop"
-          ) |>
-          mutate(location = as.integer(levels(.data$location))[.data$location])
+          )
       ) |>
       write_vc(
         file = file.path("hibernation", "total_location"),
         root = root,
         optimize = FALSE,
         append = TRUE,
-        sorting = c("model_type", "species", "winter", "location", "analysis"),
+        sorting = c(
+          "model_type",
+          "species",
+          "winter",
+          "location_id",
+          "analysis"
+        ),
         digits = 6
       )
     update_metadata(
@@ -695,7 +717,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
         analysis = "The file fingerprint of the analysis",
         fingerprint = "The status fingerprint of the analysis",
         winter = "The winter season defined by the year in which January falls",
-        location = "The unique identifier of the location",
+        location_id = "The unique identifier of the location",
         mean = "The average of the imputed total number of hibernating bats",
         min = "The minimum of the imputed total number of hibernating bats",
         p05 = "The 5% quantile of the imputed total number of hibernating bats",
@@ -720,7 +742,11 @@ extract_results.n2kAggregate <- function(x, root, ...) {
         max = "The maximum of the imputed total number of hibernating bats"
       )
     )
-  } else if (
+    rm(x, results)
+    gc(verbose = FALSE)
+    return(invisible(NULL))
+  }
+  if (
     any(
       c("fortress", "marl_quarry", "other_large", "small") %in%
         colnames(results)
@@ -819,82 +845,84 @@ extract_results.n2kAggregate <- function(x, root, ...) {
         max = "The maximum of the imputed total number of hibernating bats"
       )
     )
-  } else {
-    x@AnalysisMetadata |>
-      select(
-        species = "species_group_id",
-        "model_type",
-        analysis = "file_fingerprint",
-        fingerprint = "status_fingerprint"
-      ) |>
-      bind_cols(
-        results |>
-          group_by(winter = .data$winter) |>
-          summarise(
-            mean = mean(.data$total, na.rm = TRUE),
-            min = min(.data$total, na.rm = TRUE),
-            p05 = quantile(.data$total, 0.05, na.rm = TRUE),
-            p20 = quantile(.data$total, 0.2, na.rm = TRUE),
-            p35 = quantile(.data$total, 0.35, na.rm = TRUE),
-            p50 = quantile(.data$total, 0.5, na.rm = TRUE),
-            p65 = quantile(.data$total, 0.65, na.rm = TRUE),
-            p80 = quantile(.data$total, 0.8, na.rm = TRUE),
-            p95 = quantile(.data$total, 0.95, na.rm = TRUE),
-            max = max(.data$total, na.rm = TRUE)
-          )
-      ) |>
-      write_vc(
-        file = file.path("hibernation", "total"),
-        root = root,
-        optimize = FALSE,
-        append = TRUE,
-        sorting = c("model_type", "species", "winter", "analysis"),
-        digits = 6
-      )
-    update_metadata(
+    rm(x, results)
+    gc(verbose = FALSE)
+    return(invisible(NULL))
+  }
+  x@AnalysisMetadata |>
+    select(
+      species = "species_group_id",
+      "model_type",
+      analysis = "file_fingerprint",
+      fingerprint = "status_fingerprint"
+    ) |>
+    bind_cols(
+      results |>
+        group_by(winter = .data$winter) |>
+        summarise(
+          mean = mean(.data$total, na.rm = TRUE),
+          min = min(.data$total, na.rm = TRUE),
+          p05 = quantile(.data$total, 0.05, na.rm = TRUE),
+          p20 = quantile(.data$total, 0.2, na.rm = TRUE),
+          p35 = quantile(.data$total, 0.35, na.rm = TRUE),
+          p50 = quantile(.data$total, 0.5, na.rm = TRUE),
+          p65 = quantile(.data$total, 0.65, na.rm = TRUE),
+          p80 = quantile(.data$total, 0.8, na.rm = TRUE),
+          p95 = quantile(.data$total, 0.95, na.rm = TRUE),
+          max = max(.data$total, na.rm = TRUE)
+        )
+    ) |>
+    write_vc(
       file = file.path("hibernation", "total"),
       root = root,
-      name = "hibernation_total",
-      title = "The imputed total number of hibernating bats",
-      description = paste(
-        "The imputed total number of hibernating bats in the winter season.",
-        "Missing values are imputed before calculating the total.",
-        "The model is a first order random walk on the winter season with a",
-        "negative binomial distribution."
-      ),
-      field_description = c(
-        species = "The code of the species group",
-        model_type = paste(
-          "A short description of the model used to calculate the totals"
-        ),
-        analysis = "The file fingerprint of the analysis",
-        fingerprint = "The status fingerprint of the analysis",
-        winter = "The winter season defined by the year in which January falls",
-        mean = "The average of the imputed total number of hibernating bats",
-        min = "The minimum of the imputed total number of hibernating bats",
-        p05 = "The 5% quantile of the imputed total number of hibernating bats",
-        p20 = paste(
-          "The 20% quantile of the imputed total number of hibernating bats"
-        ),
-        p35 = paste(
-          "The 35% quantile of the imputed total number of hibernating bats"
-        ),
-        p50 = paste(
-          "The 50% quantile of the imputed total number of hibernating bats"
-        ),
-        p65 = paste(
-          "The 65% quantile of the imputed total number of hibernating bats"
-        ),
-        p80 = paste(
-          "The 80% quantile of the imputed total number of hibernating bats"
-        ),
-        p95 = paste(
-          "The 95% quantile of the imputed total number of hibernating bats"
-        ),
-        max = "The maximum of the imputed total number of hibernating bats"
-      )
+      optimize = FALSE,
+      append = TRUE,
+      sorting = c("model_type", "species", "winter", "analysis"),
+      digits = 6
     )
-  }
+  update_metadata(
+    file = file.path("hibernation", "total"),
+    root = root,
+    name = "hibernation_total",
+    title = "The imputed total number of hibernating bats",
+    description = paste(
+      "The imputed total number of hibernating bats in the winter season.",
+      "Missing values are imputed before calculating the total.",
+      "The model is a first order random walk on the winter season with a",
+      "negative binomial distribution."
+    ),
+    field_description = c(
+      species = "The code of the species group",
+      model_type = paste(
+        "A short description of the model used to calculate the totals"
+      ),
+      analysis = "The file fingerprint of the analysis",
+      fingerprint = "The status fingerprint of the analysis",
+      winter = "The winter season defined by the year in which January falls",
+      mean = "The average of the imputed total number of hibernating bats",
+      min = "The minimum of the imputed total number of hibernating bats",
+      p05 = "The 5% quantile of the imputed total number of hibernating bats",
+      p20 = paste(
+        "The 20% quantile of the imputed total number of hibernating bats"
+      ),
+      p35 = paste(
+        "The 35% quantile of the imputed total number of hibernating bats"
+      ),
+      p50 = paste(
+        "The 50% quantile of the imputed total number of hibernating bats"
+      ),
+      p65 = paste(
+        "The 65% quantile of the imputed total number of hibernating bats"
+      ),
+      p80 = paste(
+        "The 80% quantile of the imputed total number of hibernating bats"
+      ),
+      p95 = paste(
+        "The 95% quantile of the imputed total number of hibernating bats"
+      ),
+      max = "The maximum of the imputed total number of hibernating bats"
+    )
+  )
   rm(x, results)
   gc(verbose = FALSE)
   return(invisible(NULL))
@@ -910,7 +938,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
 #' @importFrom n2kanalysis get_file_fingerprint spde2mesh status
 #' @importFrom purrr map map2_dfc
 #' @importFrom sf st_area st_as_sf st_convex_hull st_sample st_union
-#' @importFrom stringr str_detect
+#' @importFrom stringr str_detect str_remove str_replace_all
 #' @importFrom stats quantile
 #' @importFrom tibble rownames_to_column
 #' @importFrom tidyr everything pivot_longer pivot_wider unnest
@@ -936,6 +964,24 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
       names_to = "sim",
       values_to = "estimate"
     ) -> post_sample
+  x@Data |>
+    distinct(
+      .data$location_id,
+      .data$fortress,
+      .data$marl_quarry,
+      .data$other_large,
+      .data$small
+    ) |>
+    transmute(
+      .data$location_id,
+      type = case_when(
+        .data$fortress > 0 ~ "fortress",
+        .data$marl_quarry > 0 ~ "marl quarry",
+        .data$other_large > 0 ~ "other large",
+        .data$small > 0 ~ "small"
+      ) |>
+        factor(c("fortress", "marl quarry", "other large", "small"))
+    ) -> location_type
   # extract the intercept and the winter effect
   post_sample |>
     filter(
@@ -943,14 +989,16 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         c("fortress:1", "marl_quarry:1", "other_large:1", "small:1")
     ) |>
     transmute(
-      type = str_remove(.data$parameter, ":1"),
+      type = str_remove(.data$parameter, ":1") |>
+        str_replace_all("_", " ") |>
+        factor(levels = levels(location_type$type)),
       .data$sim,
       intercept = .data$estimate
     ) -> ps_intercept
   post_sample |>
-    filter(str_detect(.data$parameter, "winter_r")) |>
+    filter(str_detect(.data$parameter, "winter_i")) |>
     transmute(
-      winter_r = str_remove(.data$parameter, "winter_r:") |>
+      winter_r = str_remove(.data$parameter, "winter_i:") |>
         as.integer(),
       .data$sim,
       .data$estimate
@@ -1034,7 +1082,7 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     arrange(.data$parameter) |>
     select(-"parameter") |>
     as.matrix() -> ps_matern
-  x@Model$.args$data[c("location", "X", "Y")] |>
+  x@Model$.args$data[c("location_id", "X", "Y")] |>
     as.data.frame() |>
     distinct() |>
     filter(!is.na(.data$X)) -> loc_coordinates
@@ -1044,88 +1092,65 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
   )
   x@Data |>
     distinct(
-      .data$location,
-      .data$fortress,
-      .data$marl_quarry,
-      .data$other_large,
-      .data$small
-    ) |>
-    transmute(
-      location_id = as.character(.data$location) |>
-        as.integer(),
-      type = case_when(
-        .data$fortress > 0 ~ "fortress",
-        .data$marl_quarry > 0 ~ "marl quarry",
-        .data$other_large > 0 ~ "other large",
-        .data$small > 0 ~ "small"
-      ) |>
-        factor(c("fortress", "marl quarry", "other large", "small"))
-    ) -> location_type
-  x@Data |>
-    distinct(
-      .data$location,
+      .data$location_id,
+      location_i = as.integer(.data$location_i),
       .data$winter,
       .data$winter_l,
       .data$winter_q,
       .data$winter_c
-    ) |>
-    mutate(
-      location = as.character(.data$location) |>
-        as.integer()
     ) -> location_winter
   post_sample |>
-    filter(str_detect(.data$parameter, "^location:")) |>
+    filter(str_detect(.data$parameter, "^location_i:")) |>
     transmute(
-      location_id = str_remove(.data$parameter, "location:") |>
+      location_i = str_remove(.data$parameter, "location_i:") |>
         as.integer(),
       .data$sim,
       q0 = .data$estimate
     ) |>
-    inner_join(
+    left_join(
       post_sample |>
         filter(str_detect(.data$parameter, "^location_l:")) |>
         transmute(
-          location_id = str_remove(.data$parameter, "location_l:") |>
+          location_i = str_remove(.data$parameter, "location_l:") |>
             as.integer(),
           .data$sim,
           q1 = .data$estimate
         ),
-      by = c("location_id", "sim")
+      by = c("location_i", "sim")
     ) |>
-    inner_join(
+    left_join(
       post_sample |>
         filter(str_detect(.data$parameter, "^location_q:")) |>
         transmute(
-          location_id = str_remove(.data$parameter, "location_q:") |>
+          location_i = str_remove(.data$parameter, "location_q:") |>
             as.integer(),
           .data$sim,
           q2 = .data$estimate
         ),
-      by = c("location_id", "sim")
+      by = c("location_i", "sim")
     ) |>
-    inner_join(
+    left_join(
       post_sample |>
         filter(str_detect(.data$parameter, "^location_c:")) |>
         transmute(
-          location_id = str_remove(.data$parameter, "location_c:") |>
+          location_i = str_remove(.data$parameter, "location_c:") |>
             as.integer(),
           .data$sim,
           q3 = .data$estimate
         ),
-      by = c("location_id", "sim")
-    ) |>
-    mutate(
-      location_id = levels(x@Model$.args$data$location)[.data$location_id] |>
-        as.integer()
+      by = c("location_i", "sim")
     ) |>
     inner_join(
       location_winter |>
-        group_by(location_id = .data$location) |>
-        summarise(across(
-          c("winter_l", "winter_q", "winter_c"),
-          ~ !any(is.na(.x))
-        )),
-      by = "location_id"
+        group_by(.data$location_i, .data$location_id) |>
+        summarise(
+          across(
+            c("winter_l", "winter_q", "winter_c"),
+            ~ !any(is.na(.x))
+          ),
+          .groups = "drop"
+        ),
+      by = "location_i"
     ) |>
     transmute(
       .data$location_id,
@@ -1133,15 +1158,14 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
       .data$q0,
       q1 = ifelse(.data$winter_l, .data$q1, 0),
       q2 = ifelse(.data$winter_q, .data$q2, 0),
-      q3 = ifelse(.data$winter_c, .data$q3, 0)
+      q3 = ifelse(.data$winter_c, .data$q3, 0),
+      across(c("q0", "q1", "q2", "q3"), ~ replace_na(.x, 0))
     ) |>
     inner_join(
       as.matrix(projector$proj$A %*% ps_matern) |>
         as.data.frame() |>
         mutate(
-          location_id = loc_coordinates$location,
-          location_id = levels(.data$location_id)[.data$location_id] |>
-            as.integer()
+          location_id = loc_coordinates$location_id
         ) |>
         pivot_longer(starts_with("sim"), names_to = "sim", values_to = "mesh"),
       by = c("location_id", "sim")
@@ -1236,7 +1260,7 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     mutate(
       across(c("winter_l", "winter_q", "winter_c"), ~ replace_na(.x, 0))
     ) |>
-    inner_join(x = location_type, by = c("location_id" = "location")) |>
+    inner_join(x = location_type, by = "location_id") |>
     inner_join(
       ps_location,
       by = "location_id",
@@ -1320,70 +1344,62 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
 
   # sublocation effect
   x@Data |>
+    filter(!is.na(.data$sublocation_id)) |>
     distinct(
-      .data$location,
-      .data$sublocation,
+      .data$location_id,
+      sublocation_i = as.integer(.data$sublocation_i),
+      .data$sublocation_id,
       .data$winter,
       .data$winter_l,
       .data$winter_q,
       .data$winter_c
-    ) |>
-    mutate(
-      location = as.character(.data$location) |>
-        as.integer(),
-      sublocation = as.character(.data$sublocation) |>
-        as.integer()
     ) -> sublocation_winter
   post_sample |>
-    filter(str_detect(.data$parameter, "^sublocation:")) |>
+    filter(str_detect(.data$parameter, "^sublocation_i:")) |>
     transmute(
-      sublocation_id = str_remove(.data$parameter, "sublocation:") |>
-        as.integer(),
+      sublocation_i = str_remove(.data$parameter, "sublocation_i:"),
       .data$sim,
       q0 = .data$estimate
     ) |>
-    inner_join(
+    left_join(
       post_sample |>
         filter(str_detect(.data$parameter, "^sublocation_l:")) |>
         transmute(
-          sublocation_id = str_remove(.data$parameter, "sublocation_l:") |>
-            as.integer(),
+          sublocation_i = str_remove(.data$parameter, "sublocation_l:"),
           .data$sim,
           q1 = .data$estimate
         ),
-      by = c("sublocation_id", "sim")
+      by = c("sublocation_i", "sim")
     ) |>
-    inner_join(
+    left_join(
       post_sample |>
         filter(str_detect(.data$parameter, "^sublocation_q:")) |>
         transmute(
-          sublocation_id = str_remove(.data$parameter, "sublocation_q:") |>
-            as.integer(),
+          sublocation_i = str_remove(.data$parameter, "sublocation_q:"),
           .data$sim,
           q2 = .data$estimate
         ),
-      by = c("sublocation_id", "sim")
+      by = c("sublocation_i", "sim")
     ) |>
-    inner_join(
+    left_join(
       post_sample |>
         filter(str_detect(.data$parameter, "^sublocation_c:")) |>
         transmute(
-          sublocation_id = str_remove(.data$parameter, "sublocation_c:") |>
-            as.integer(),
+          sublocation_i = str_remove(.data$parameter, "sublocation_c:"),
           .data$sim,
           q3 = .data$estimate
         ),
-      by = c("sublocation_id", "sim")
+      by = c("sublocation_i", "sim")
     ) |>
     mutate(
-      sublocation_id = levels(x@Data$sublocation)[.data$sublocation_id] |>
-        as.integer()
+      sublocation_i = as.integer(.data$sublocation_i)
     ) |>
     inner_join(
       sublocation_winter |>
         group_by(
-          location_id = .data$location,
-          sublocation_id = .data$sublocation
+          .data$location_id,
+          .data$sublocation_id,
+          .data$sublocation_i
         ) |>
         summarise(
           across(
@@ -1392,7 +1408,7 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
           ),
           .groups = "drop"
         ),
-      by = "sublocation_id"
+      by = "sublocation_i"
     ) |>
     transmute(
       .data$location_id,
@@ -1401,7 +1417,8 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
       .data$q0,
       q1 = ifelse(.data$winter_l, .data$q1, 0),
       q2 = ifelse(.data$winter_q, .data$q2, 0),
-      q3 = ifelse(.data$winter_c, .data$q3, 0)
+      q3 = ifelse(.data$winter_c, .data$q3, 0),
+      across(c("q0", "q1", "q2", "q3"), ~ replace_na(.x, 0))
     ) -> ps_sublocation
   x@AnalysisMetadata |>
     select(
@@ -1510,7 +1527,7 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
             mutate(
               across(c("winter_l", "winter_q", "winter_c"), ~ replace_na(.x, 0))
             ),
-          by = c("sublocation_id" = "sublocation"),
+          by = c("location_id", "sublocation_id"),
           relationship = "many-to-many"
         ) |>
         inner_join(
@@ -1542,7 +1559,7 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         )
     ) |>
     write_vc(
-      file = file.path("model_check", "hiberanation", "sublocation"),
+      file = file.path("model_check", "hibernation", "sublocation"),
       root = root,
       append = TRUE,
       sorting = c(
@@ -1553,10 +1570,10 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
         "winter",
         "analysis"
       ),
-      digitis = 4
+      digits = 4
     )
   update_metadata(
-    file = file.path("model_check", "hiberanation", "sublocation"),
+    file = file.path("model_check", "hibernation", "sublocation"),
     root = root,
     name = "hibernation_model_check_sublocation_prediction",
     title = "Predictions at the sublocation level",
@@ -1798,8 +1815,7 @@ extract_results.n2kHurdleImputed <- function(x, root, ...) {
     bind_cols(
       x@Hurdle@Covariate |>
         transmute(
-          location = levels(.data$location)[.data$location] |>
-            as.integer(),
+          .data$location_id,
           type = case_when(
             .data$fortress > 0 ~ "fortress",
             .data$marl_quarry > 0 ~ "marl quarry",
@@ -1807,9 +1823,8 @@ extract_results.n2kHurdleImputed <- function(x, root, ...) {
             .data$small > 0 ~ "small"
           ) |>
             factor(c("fortress", "marl quarry", "other large", "small")),
-          sublocation = levels(.data$sublocation)[.data$sublocation] |>
-            as.integer(),
-          winter = .data$winter
+          .data$sublocation_id,
+          .data$winter
         ) |>
         bind_cols(x@Hurdle@Imputation) |>
         pivot_longer(
@@ -1817,7 +1832,12 @@ extract_results.n2kHurdleImputed <- function(x, root, ...) {
           names_to = "imputation",
           values_to = "number"
         ) |>
-        group_by(.data$location, .data$type, .data$sublocation, .data$winter) |>
+        group_by(
+          .data$location_id,
+          .data$type,
+          .data$sublocation_id,
+          .data$winter
+        ) |>
         summarise(
           across(
             "number",
@@ -1848,8 +1868,8 @@ extract_results.n2kHurdleImputed <- function(x, root, ...) {
       sorting = c(
         "model_type",
         "species",
-        "location",
-        "sublocation",
+        "location_id",
+        "sublocation_id",
         "winter",
         "analysis"
       ),
