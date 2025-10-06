@@ -542,6 +542,7 @@ prepare_analysis_model_species <- function(
     last_imported_year = max(dataset$winter) - 1,
     imputation_size = 100,
     control = list(
+      control.fixed = list(prec = 0.03),
       control.family = list(
         list(hyper = list(theta2 = list(initial = -20, fixed = TRUE)))
       )
@@ -550,7 +551,7 @@ prepare_analysis_model_species <- function(
   store_model(count, base = base, project = project, overwrite = overwrite)
 
   # combine the models into a hurdle model
-  display(verbose = verbose, "    dependend models")
+  display(verbose = verbose, "    dependent models")
   hurdle <- n2k_hurdle_imputed(presence = presence, count = count)
   store_model(hurdle, base = base, project = project, overwrite = overwrite)
 
@@ -635,6 +636,7 @@ prepare_analysis_model_species <- function(
     overwrite = overwrite
   )
 
+  display(verbose = verbose, "    index model")
   extractor_fun <- function(model) {
     rbind(
       model$summary.lincomb.derived[, c("mean", "sd")],
