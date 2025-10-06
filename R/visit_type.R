@@ -75,8 +75,8 @@ visit_type <- function(
       .data$date,
       type = ifelse(
         abs(.data$delta) == min(abs(.data$delta)),
-        ifelse(.data$date < start, "old", "total"),
-        "extra"
+        ifelse(.data$date < start, "old total", "total"),
+        ifelse(.data$date < start, "old extra total", "extra total")
       )
     ) -> non_detailed_visits
   non_detailed_visits |>
@@ -85,7 +85,7 @@ visit_type <- function(
       type = ifelse(
         .data$visit_id == min(.data$visit_id),
         "total",
-        "extra"
+        "extra total"
       )
     ) |>
     bind_rows(
@@ -123,7 +123,7 @@ visit_type <- function(
       type = ifelse(
         abs(.data$delta) == min(abs(.data$delta)),
         ifelse(.data$date < start, "old detail", "detail"),
-        "extra detail"
+        ifelse(.data$date < start, "old extra detail", "extra detail")
       )
     ) |>
     ungroup() -> samples
@@ -143,6 +143,44 @@ visit_type <- function(
       samples |>
         filter(.data$type != "detail")
     ) -> samples
+
+  # detailed locations but only totals available
+  remainder |>
+    anti_join(samples, by = "visit_id") |>
+    left_join(
+      samples |>
+        distinct(.data$location_id, .data$winter, type = "extra total"),
+      by = c("location_id", "winter")
+    ) |>
+    group_by(.data$location_id, .data$winter) |>
+    mutate(
+      type = ifelse(
+        is.na(.data$type),
+        ifelse(
+          abs(.data$delta) == min(abs(.data$delta)),
+          ifelse(.data$date < start, "old total", "total"),
+          ifelse(.data$date < start, "old extra total", "extra total")
+        ),
+        .data$type
+      )
+    ) |>
+    select(-"delta") -> total_only
+  # make sure to keep only one total per winter
+  total_only |>
+    filter(.data$type == "total") |>
+    group_by(.data$location_id, .data$winter) |>
+    mutate(
+      type = ifelse(
+        .data$visit_id == min(.data$visit_id),
+        "total",
+        "extra total"
+      )
+    ) |>
+    ungroup() |>
+    bind_rows(
+      total_only |>
+        filter(.data$type != "total")
+    ) -> total_only
 
   # nearby extra visits can be alternatives
   samples |>
@@ -164,26 +202,7 @@ visit_type <- function(
     bind_rows(
       samples |>
         filter(.data$type != "extra detail"),
-      remainder |>
-        anti_join(samples, by = "visit_id") |>
-        left_join(
-          samples |>
-            distinct(.data$location_id, .data$winter, type = "extra total"),
-          by = c("location_id", "winter")
-        ) |>
-        group_by(.data$location_id, .data$winter) |>
-        mutate(
-          type = ifelse(
-            is.na(.data$type),
-            ifelse(
-              abs(.data$delta) == min(abs(.data$delta)),
-              ifelse(.data$date < start, "old total", "total"),
-              "extra total"
-            ),
-            .data$type
-          )
-        ) |>
-        select(-"delta")
+      total_only
     ) -> detailed
   detailed |>
     filter(.data$type %in% c("detail", "total")) |>
