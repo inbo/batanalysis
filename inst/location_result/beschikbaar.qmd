@@ -173,7 +173,10 @@ visits |>
     data = badges,
     aes(xmin = score, xmax = score_max, ymin = -Inf, ymax = Inf, fill = badge)
   ) +
-  geom_rect(aes(xmin = x0, xmax = x, ymin = 0, ymax = 1), fill = NA, colour = inbo_steun_blauw) +
+  geom_rect(
+    aes(xmin = x0, xmax = x, ymin = 0, ymax = 1), fill = NA,
+    colour = inbo_steun_blauw
+  ) +
   geom_label_repel(
     aes(x = (x + x0) / 2, y = ylab, label = winter),
     colour = inbo_hoofd,
@@ -200,7 +203,7 @@ visits |>
 
 ```{r}
 #| label: tbl-overzicht-scores
-#| tbl-cap: Overzicht van de monitoringscores van alle winterverblijven in 
+#| tbl-cap: Overzicht van de monitoringscores van alle winterverblijven in
 #|   [meetnetten.be](https://www.meetnetten.be).
 scores |>
   count(.data$badge, name = "aantal") |>

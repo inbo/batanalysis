@@ -10,7 +10,7 @@
 #' @param visits The output of `visit_type()`
 #' @export
 #' @importFrom dplyr bind_rows distinct filter inner_join left_join mutate
-#' n_distinct select slice_max
+#' n_distinct select slice_min slice_max
 #' @importFrom git2rdata recent_commit verify_vc
 #' @importFrom n2kanalysis display n2k_aggregate n2k_hurdle_imputed
 #' n2k_model_imputed n2k_spde spde store_model

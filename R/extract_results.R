@@ -933,7 +933,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
 }
 
 #' @export
-#' @importFrom assertthat assert_that
+#' @importFrom assertthat assert_that is.count noNA
 #' @importFrom dplyr arrange bind_cols distinct group_by inner_join mutate
 #' row_number select starts_with summarise
 #' @importFrom git2rdata is_git2rdata update_metadata write_vc

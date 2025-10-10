@@ -101,7 +101,7 @@ display_flanders_type <- function(flanders_type, this_species) {
     geom_ribbon(
       aes(ymin = .data$p35, ymax = .data$p65, fill = .data$type), alpha = 0.5
     ) +
-    geom_line(aes(y = mean, colour = type)) +
+    geom_line(aes(y = mean, colour = .data$type)) +
     scale_x_continuous() +
     scale_y_continuous(limits = c(0, NA)) +
     theme(axis.title = element_blank())
