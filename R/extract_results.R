@@ -119,7 +119,7 @@ extract_results.character <- function(
   }
   if (random) {
     manifest <- sample(manifest)
-  } else {
+  } else if (inherits(base, "character")) {
     file.path(base, project) |>
       list.files(pattern = ".rds$", full.names = TRUE, recursive = TRUE) |>
       grepv(pattern = "converged") |>
