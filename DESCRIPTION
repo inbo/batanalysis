@@ -12,6 +12,8 @@ Description: The reproducible analysis of the bat monitoring data in
 License: GPL-3
 URL: https://github.com/inbo/batanalysis
 BugReports: https://github.com/inbo/batanalysis/issues
+Depends: 
+    R (>= 4.2.0)
 Imports: 
     assertthat,
     curl,
