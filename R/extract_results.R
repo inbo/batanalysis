@@ -28,67 +28,69 @@ extract_results.character <- function(
   ...
 ) {
   assert_that(is.string(x), noNA(x), is.flag(random), noNA(random))
-  file.path("data", "hibernation", "species") |>
-    verify_vc(
-      root = raw_data,
-      variables = c("id", "code", "name", "scientific_name", "parent")
-    ) |>
-    write_vc(
+  if (!missing(raw_data)) {
+    file.path("data", "hibernation", "species") |>
+      verify_vc(
+        root = raw_data,
+        variables = c("id", "code", "name", "scientific_name", "parent")
+      ) |>
+      write_vc(
+        file.path("hibernation", "species"),
+        root = root,
+        sorting = "id",
+        optimize = FALSE
+      )
+    update_metadata(
       file.path("hibernation", "species"),
       root = root,
-      sorting = "id",
-      optimize = FALSE
+      name = "hibernation_species",
+      title = "Hibernating bat species",
+      description = paste(
+        "List of species potentially relevant for the hibernating bat",
+        "monitoring in Flanders (Belgium)."
+      ),
+      field_description = c(
+        id = "Unique identifier of the species",
+        name = "Dutch vernacular name",
+        scientific_name = "Scientific name of the species",
+        code = "Code of the species",
+        parent = "Unique identifier of the parent species"
+      )
     )
-  update_metadata(
-    file.path("hibernation", "species"),
-    root = root,
-    name = "hibernation_species",
-    title = "Hibernating bat species",
-    description = paste(
-      "List of species potentially relevant for the hibernating bat",
-      "monitoring in Flanders (Belgium)."
-    ),
-    field_description = c(
-      id = "Unique identifier of the species",
-      name = "Dutch vernacular name",
-      scientific_name = "Scientific name of the species",
-      code = "Code of the species",
-      parent = "Unique identifier of the parent species"
-    )
-  )
-  file.path("data", "hibernation", "locations") |>
-    verify_vc(
-      root = raw_data,
-      variables = c("id", "code", "name", "parent_id")
-    ) |>
-    write_vc(
+    file.path("data", "hibernation", "locations") |>
+      verify_vc(
+        root = raw_data,
+        variables = c("id", "code", "name", "parent_id")
+      ) |>
+      write_vc(
+        file.path("hibernation", "locations"),
+        root = root,
+        sorting = "id",
+        optimize = FALSE,
+        digits = c("longitude" = 8, "latitude" = 8)
+      )
+    update_metadata(
       file.path("hibernation", "locations"),
       root = root,
-      sorting = "id",
-      optimize = FALSE,
-      digits = c("longitude" = 8, "latitude" = 8)
+      name = "hibernation_locations",
+      title = paste(
+        "Locations and sublocations surveyed during the hibernating bat",
+        "monitoring"
+      ),
+      description = paste(
+        "List of locations and sublocations surveyed during the hibernating",
+        "bat monitoring in Flanders (Belgium)."
+      ),
+      field_description = c(
+        id = "Unique identifier of the location or sublocation",
+        name = "Name of the location or sublocation",
+        parent_id = "Unique identifier of the parent location (-1 for locations)",
+        code = "Code of the location or sublocation",
+        longitude = "Longitude of the location or sublocation (EPSG:4326)",
+        latitude = "Latitude of the location or sublocation (EPSG:4326)"
+      )
     )
-  update_metadata(
-    file.path("hibernation", "locations"),
-    root = root,
-    name = "hibernation_locations",
-    title = paste(
-      "Locations and sublocations surveyed during the hibernating bat",
-      "monitoring"
-    ),
-    description = paste(
-      "List of locations and sublocations surveyed during the hibernating",
-      "bat monitoring in Flanders (Belgium)."
-    ),
-    field_description = c(
-      id = "Unique identifier of the location or sublocation",
-      name = "Name of the location or sublocation",
-      parent_id = "Unique identifier of the parent location (-1 for locations)",
-      code = "Code of the location or sublocation",
-      longitude = "Longitude of the location or sublocation (EPSG:4326)",
-      latitude = "Latitude of the location or sublocation (EPSG:4326)"
-    )
-  )
+  }
   read_manifest(base = base, project = project, hash = x) |>
     order_manifest() -> manifest
   for (type in c(
