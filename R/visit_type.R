@@ -60,9 +60,6 @@ visit_type <- function(
       sublocations,
       by = c("id" = "parent_id")
     ) -> non_detailed_locations
-  all_locations |>
-    filter(.data$parent_id < 0) |>
-    semi_join(sublocations, by = c("id" = "parent_id")) -> detailed_locations
   visits |>
     semi_join(
       non_detailed_locations,

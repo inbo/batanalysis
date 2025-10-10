@@ -18,11 +18,6 @@ prepare_analysis_model <- function(
   overwrite = FALSE,
   verbose = TRUE
 ) {
-  visit_type(
-    raw_data = raw_data,
-    start_winter = start_winter,
-    max_delta = max_delta
-  ) -> visits
   c(
     "Mbec",
     "Mdas",
@@ -43,7 +38,11 @@ prepare_analysis_model <- function(
         project = project,
         overwrite = overwrite,
         raw_data = raw_data,
-        visits = visits,
+        visits = visit_type(
+          raw_data = raw_data,
+          start_winter = start_winter,
+          max_delta = max_delta
+        ),
         verbose = verbose
       )
     ) |>

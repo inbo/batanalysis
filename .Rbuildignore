@@ -1,3 +1,4 @@
+.*_files
 ^.*\.Rproj$
 ^CITATION\.cff$
 ^LICENSE.md$
@@ -17,4 +18,3 @@
 ^man-roxygen$
 ^organisation.yml$
 ^pkgdown$
-.*_files

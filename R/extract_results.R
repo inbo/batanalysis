@@ -84,7 +84,9 @@ extract_results.character <- function(
       field_description = c(
         id = "Unique identifier of the location or sublocation",
         name = "Name of the location or sublocation",
-        parent_id = "Unique identifier of the parent location (-1 for locations)",
+        parent_id = paste(
+          "Unique identifier of the parent location (-1 for locations)"
+        ),
         code = "Code of the location or sublocation",
         longitude = "Longitude of the location or sublocation (EPSG:4326)",
         latitude = "Latitude of the location or sublocation (EPSG:4326)"
@@ -1207,8 +1209,8 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
     title = "Location specific effects",
     description = paste(
       "Posterior distribution of the location specific effects.",
-      "The effects are on the logit scale for binomial models and the log scale",
-      "for nbinomial models."
+      "The effects are on the logit scale for binomial models and the log",
+      "scale for nbinomial models."
     ),
     field_description = c(
       species = "The code of the species group",
@@ -1592,7 +1594,9 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
       analysis = "The file fingerprint of the analysis",
       fingerprint = "The status fingerprint of the analysis",
       location_id = "The unique identifier of the location",
-      sublocation_id = "The unique identifier of the sublocation within a location",
+      sublocation_id = paste(
+        "The unique identifier of the sublocation within a location"
+      ),
       winter = "The winter season defined by the year in which January falls",
       relative_mean = paste(
         "The mean of the difference between the local trend and the global",
