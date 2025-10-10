@@ -19,9 +19,36 @@ prepare_analysis_model(
 \arguments{
 \item{raw_data}{The git repository with the raw data}
 
+\item{start_winter}{The starting winter (year) for the analysis.
+This is the year of first of January.
+For example, for the winter 2000-2001, use 2001.
+The default is 23 years before the current year.
+This means that in 2024 the default is 2001.
+This means that the analysis will use data from the winter
+2000-2001 up to the last completed winter.}
+
 \item{base}{The base location to store the model.}
 
 \item{project}{Will be a relative path within the base location.}
+
+\item{max_delta}{Only relevant in case of multiple visits within the same
+winter to a location divided into sublocation.
+We select for every winter per sublocation the visit that is closest to the
+middle of the winter (15th of January).
+All selected visits of a location for a given winter should be within
+\code{max_delta} days from each other.
+If not, we drop the visits the furthest away from the middle of the winter
+until the condition is met.
+This ensures that the visits to the sublocations are not too far apart in
+time.
+The default is 10 days.
+This means that all visits to sublocations of a location should be
+within 10 days from each other.
+This allows to spread the visits over a few days.}
+
+\item{n_extrapolation}{Impute only locations or sublocations when there is no
+more than \code{n_extrapolation} winters between the observation to impute and the
+nearest observation.}
 
 \item{max_dist}{The maximum distance for the range in kilometres}
 

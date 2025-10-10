@@ -25,7 +25,13 @@ prepare_analysis_model_species(
 
 \item{project}{Will be a relative path within the base location.}
 
+\item{n_extrapolation}{Impute only locations or sublocations when there is no
+more than \code{n_extrapolation} winters between the observation to impute and the
+nearest observation.}
+
 \item{max_dist}{The maximum distance for the range in kilometres}
+
+\item{visits}{The output of \code{visit_type()}}
 
 \item{overwrite}{Should an existing object be overwritten?
 Defaults to \code{TRUE}.}
@@ -33,10 +39,6 @@ Defaults to \code{TRUE}.}
 \item{verbose}{A logical.
 When \code{TRUE} print the message.
 When \code{FALSE} do nothing.}
-
-\item{n_extrapolate}{Impute only locations or sublocations when there is no
-more than \code{n_extrapolate} winters between the observation to impute and the
-nearest observation.}
 }
 \description{
 Prepare the analysis models for a single species

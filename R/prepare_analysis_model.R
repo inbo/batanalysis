@@ -1,5 +1,6 @@
 #' Prepare analysis models for all species
 #' @inheritParams prepare_analysis_model_species
+#' @inheritParams visit_type
 #' @inheritParams n2kanalysis::store_model
 #' @inheritParams n2kanalysis::display
 #' @export

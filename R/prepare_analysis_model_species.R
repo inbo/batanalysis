@@ -3,10 +3,11 @@
 #' @inheritParams n2kanalysis::display
 #' @param raw_data The git repository with the raw data
 #' @param species the code of the species
-#' @param n_extrapolate Impute only locations or sublocations when there is no
-#' more than `n_extrapolate` winters between the observation to impute and the
+#' @param n_extrapolation Impute only locations or sublocations when there is no
+#' more than `n_extrapolation` winters between the observation to impute and the
 #' nearest observation.
 #' @param max_dist The maximum distance for the range in kilometres
+#' @param visits The output of `visit_type()`
 #' @export
 #' @importFrom dplyr bind_rows distinct filter inner_join left_join mutate
 #' n_distinct select slice_max
