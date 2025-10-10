@@ -5,6 +5,7 @@ params:
   location: 20352
   name: Fort Lier (3010)
   n_winter: 24
+  detail: false
 ---
 
 ```{r}
@@ -40,28 +41,20 @@ display_totals <- function(timeseries, this_species, raw_data) {
         transmute(.data$winter, .data$p50, analyse = TRUE),
       by = c("winter", "analyse")
     ) |>
-    mutate(analyse = !is.na(.data$p50)) -> raw_data
-  p <- ggplot(this_totals, aes(x = winter, y = mean)) +
+    mutate(analyse = !is.na(.data$p50)) |>
+    arrange(.data$analyse, .data$winter) -> raw_data
+  p <- ggplot(this_totals, aes(x = .data$winter, y = .data$mean)) +
+    geom_point(data = raw_data, aes(y = .data$total, colour = .data$analyse)) +
     geom_ribbon(aes(ymin = .data$p05, ymax = .data$p95), alpha = 0.25) +
     geom_ribbon(aes(ymin = .data$p20, ymax = .data$p80), alpha = 0.33) +
     geom_ribbon(aes(ymin = .data$p35, ymax = .data$p65), alpha = 0.5) +
     geom_line() +
-    geom_point(data = raw_data, aes(y = .data$total, colour = .data$analyse)) +
+    scale_x_continuous(breaks = breaks_pretty()) +
+    scale_y_continuous(breaks = breaks_pretty()) +
     scale_colour_discrete(
       name = "in analyse", breaks = c(TRUE, FALSE), labels = c("ja", "nee")
     ) +
     theme(axis.title = element_blank())
-  c(this_totals$total, raw_data$total) |>
-    max() -> m_tot
-  if (m_tot < 6) {
-    p <- p +
-      scale_y_continuous(
-        limits = c(0, m_tot + 1), breaks = seq_len(m_tot + 2) - 1
-      )
-  } else {
-    p <- p +
-      scale_y_continuous(limits = c(0, NA))
-  }
   print(p)
   return(this_totals)
 }
@@ -94,6 +87,27 @@ display_ratio <- function(fractions, this_species) {
     theme(axis.title = element_blank())
   print(p)
 }
+display_flanders_type <- function(flanders_type, this_species) {
+  stopifnot(require("dplyr"), require("ggplot2"))
+  flanders_type |>
+    filter(.data$species == this_species) -> this_flanders_type
+  p <- ggplot(this_flanders_type, aes(x = .data$winter)) +
+    geom_ribbon(
+      aes(ymin = .data$p05, ymax = .data$p95, fill = .data$type), alpha = 0.25
+    ) +
+    geom_ribbon(
+      aes(ymin = .data$p20, ymax = .data$p80, fill = .data$type), alpha = 0.33
+    ) +
+    geom_ribbon(
+      aes(ymin = .data$p35, ymax = .data$p65, fill = .data$type), alpha = 0.5
+    ) +
+    geom_line(aes(y = mean, colour = type)) +
+    scale_x_continuous() +
+    scale_y_continuous(limits = c(0, NA)) +
+    theme(axis.title = element_blank())
+  print(p)
+  return(invisible(NULL))
+}
 ```
 
 ```{r}
@@ -104,7 +118,7 @@ verify_vc(
 ) |>
   filter(.data$location_id == params$location) |>
   mutate(
-    analyse = (is.na(.data$level) & .data$type == "potential") |
+    analyse = (is.na(.data$level) & .data$type == "total") |
       .data$level != "rare" & .data$type == "detail" |
       .data$level == "mixed" & .data$type == "total"
   ) -> relevant_visit
@@ -141,13 +155,37 @@ file.path("hibernation", "total") |>
   verify_vc(root = result_root, variables = c("species", "winter", "mean")) |>
   inner_join(species, by = "species") -> flanders
 file.path("hibernation", "total_location") |>
-  verify_vc(root = result_root, variables = c("location", "species")) |>
-  filter(.data$location == params$location) |>
+  verify_vc(root = result_root, variables = c("location_id", "species")) |>
+  filter(.data$location_id == params$location) |>
   inner_join(species, by = "species") -> timeseries
 file.path("hibernation", "fraction_location") |>
-  verify_vc(root = result_root, variables = c("location", "species")) |>
-  filter(.data$location == params$location) |>
+  verify_vc(root = result_root, variables = c("location_id", "species")) |>
+  filter(.data$location_id == params$location) |>
   inner_join(species, by = "species") -> fractions
+file.path("hibernation", "total_type") |>
+  verify_vc(root = result_root, variables = c("species", "winter", "mean")) |>
+  inner_join(species, by = "species") |>
+  mutate(
+    type = factor(
+      .data$type,
+      levels = c("fortress", "marl quarry", "other large", "small"),
+      labels = c("fort", "groeve", "overige\ngroot", "klein")
+    )
+  ) -> flanders_type
+file.path("data", "hibernation", "location_types") |>
+  verify_vc(root = data_root, variables = c("location_id", "type")) |>
+  filter(.data$location_id == params$location) |>
+  mutate(
+    type = factor(
+      .data$type,
+      levels = c("fortress", "marl quarry", "other large", "small"),
+      labels = c("fort", "groeve", "overige groot", "klein")
+    )
+  ) |>
+  pull(type) -> location_type
+if (length(location_type) == 0) {
+  location_type <- "klein"
+}
 ```
 
 ```{r}
@@ -160,62 +198,15 @@ object_cap <- function(this_name, name, timeseries) {
 }
 flanders_cap <- "Tijdreeks van %s in Vlaanderen.
 Zie de uitleg in @sec-type-II."
+flanders_type_cap <- "Tijdreeks van %s in Vlaanderen opgesplits per type
+winterverblijf.
+Zie de uitleg in @sec-type-III."
 fraction_cap <- "Tijdreeks van %s in %s uitgedrukt als een percentage
 van de Vlaamse populatie.
-Zie de uitleg in @sec-type-III."
+Zie de uitleg in @sec-type-IV."
 ```
 
 # Resultaten per soort
-
-## Beknopte uitleg over de figuren {#sec-uitleg}
-
-We geven enkel resultaten voor de soorten we aantroffen in `r params$name`.
-Per soort tonen we maximaal drie figuren.
-Welke figuren we tonen, hangt af de aanwezigheid van de soort in dit winterverblijf en in Vlaanderen.
-Is een soort te zeldzaam in Vlaanderen, dan kunnen we geen betrouwbare trendanalyse uitvoeren.
-Hetzelfde geldt voor soorten die we niet tot op naam konden brengen.
-Voor deze soorten tonen we enkel de figuur type Ia (@sec-type-Ia).
-
-Wanneer we voldoende gegevens hebben om een betrouwbare trendanalyse uit te voeren, tonen we een tweede figuur (type II, @sec-type-II).
-
-Wanneer de soort binnen deze winterverblijf voldoende aanwezig is om ze te gebruiken bij de analyse op het niveau van Vlaanderen, tonen we een derde figuur (type III, @sec-type-III) en gebruiken we voor de eerste figuur type Ib (@sec-type-Ib) i.p.v. type Ia.
-
-### Figuur type Ia {#sec-type-Ia}
-
-Deze figuur toont de waargenomen aantallen van de soort in `r params$name` over de tijd.
-Elk punt heeft het totaal van de soort weer tijdens een bepaalde winter.
-Meerdere tellingen tijdens dezelfde winter staan dan boven elkaar.
-Merk op dat deze tellingen niet gebruikt zijn voor de trendanalyse.
-
-### Figuur type Ib {#sec-type-Ib}
-
-Deze figuur gebruikt de type Ia figuur als basis.
-De kleur van de punten geeft nu aan of de telling gebruikt is in de trendanalyse (oranje) of niet (blauw).
-Omdat dit winterverblijf gebruikt is in de trendanalyse op Vlaams niveau, kunnen we ontbrekende tellingen bijschatten.
-Hierbij kan zowel gaan over tellingen die volledig ontbreken als over tellingen die slechts gedeeltelijk uitgevoerd zijn.
-Bijgevolg is het totaal na bijschatting nooit kleiner dan het waargenomen aantal.
-De totalen na bijschatting geven we weer als een lijn en drie gekleurde banden.
-De lijn geeft het geschatte totaal weer.
-De gekleurde banden geven de onzekerheid van dit geschatte totaal weer.
-De donkerste band geeft het 30%-geloofwaardigheidsinterval weer, de middelste band het 60%-geloofwaardigheidsinterval en de lichtste band het 90%-geloofwaardigheidsinterval.
-Hoe breder de band, hoe groter de onzekerheid.
-Wanneer het winterverblijf volledig geteld is, dan is er geen onzekerheid en vallen de lijn en de banden samen met de punten (die gebruikt zijn in de analyse).
-
-### Figuur type II {#sec-type-II}
-
-Deze figuur bevat een lijn en drie gekleurde banden.
-De lijn geeft de geschatte totale populatie over alle winterverblijven weer na bijschatting van de niet-getelde (delen van) winterverblijven.
-De gekleurde banden geven de onzekerheid rond de geschatte totalen weer.
-De donkerste band geeft het 30%-geloofwaardigheidsinterval weer, de middelste band het 60%-geloofwaardigheidsinterval en de lichtste band het 90%-geloofwaardigheidsinterval.
-Hoe breder de band, hoe groter de onzekerheid.
-Hoe groter het aandeel niet-getelde (delen van) winterverblijven, hoe breder de band.
-Hoe moeilijker de aantallen van de soort te voorspellen zijn, hoe breder de band.
-
-### Figuur type III {#sec-type-III}
-
-Deze figuur toont de verhouding van de aantallen in deze winterverblijf in verhouding met de totale aantallen in Vlaanderen.
-De lijn geeft de gemiddelde schatting van de verhouding weer.
-De gekleurde banden geven de onzekerheid rond de geschatte verhouding weer.
 
 ```{r species-data}
 selected_species <- get_child_species(data_root, "Mmysbra")
@@ -390,6 +381,13 @@ this_flanders <- display_flanders(flanders, this_species)
 ```
 
 ```{r}
+#| eval: !expr 'any(raw_mmysbra$total > 0)'
+#| label: fig-mmystbra-type
+#| fig-cap: !expr 'sprintf(flanders_type_cap, this_name)'
+display_flanders_type(flanders_type, this_species)
+```
+
+```{r}
 #| eval: !expr 'any(raw_mmysbra$total > 0) && nrow(this_totals) > 0'
 #| label: fig-mmystbra-fraction
 #| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
@@ -416,6 +414,13 @@ this_totals <- display_totals(timeseries, this_species, raw_mdau)
 #| label: fig-mdau-global
 #| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
 this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mdau$total > 0)'
+#| label: fig-mdau-type
+#| fig-cap: !expr 'sprintf(flanders_type_cap, this_name)'
+display_flanders_type(flanders_type, this_species)
 ```
 
 ```{r}
@@ -448,6 +453,13 @@ this_flanders <- display_flanders(flanders, this_species)
 ```
 
 ```{r}
+#| eval: !expr 'any(raw_mema$total > 0)'
+#| label: fig-mema-type
+#| fig-cap: !expr 'sprintf(flanders_type_cap, this_name)'
+display_flanders_type(flanders_type, this_species)
+```
+
+```{r}
 #| eval: !expr 'any(raw_mema$total > 0) && nrow(this_totals) > 0'
 #| label: fig-mema-fraction
 #| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
@@ -474,6 +486,13 @@ this_totals <- display_totals(timeseries, this_species, raw_mnat)
 #| label: fig-mnat-global
 #| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
 this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mnat$total > 0)'
+#| label: fig-mnat-type
+#| fig-cap: !expr 'sprintf(flanders_type_cap, this_name)'
+display_flanders_type(flanders_type, this_species)
 ```
 
 ```{r}
@@ -506,6 +525,13 @@ this_flanders <- display_flanders(flanders, this_species)
 ```
 
 ```{r}
+#| eval: !expr 'any(raw_mdas$total > 0)'
+#| label: fig-mdas-type
+#| fig-cap: !expr 'sprintf(flanders_type_cap, this_name)'
+display_flanders_type(flanders_type, this_species)
+```
+
+```{r}
 #| eval: !expr 'any(raw_mdas$total > 0) && nrow(this_totals) > 0'
 #| label: fig-mdas-fraction
 #| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
@@ -535,6 +561,13 @@ this_flanders <- display_flanders(flanders, this_species)
 ```
 
 ```{r}
+#| eval: !expr 'any(raw_mbec$total > 0)'
+#| label: fig-mbec-type
+#| fig-cap: !expr 'sprintf(flanders_type_cap, this_name)'
+display_flanders_type(flanders_type, this_species)
+```
+
+```{r}
 #| eval: !expr 'any(raw_mbec$total > 0) && nrow(this_totals) > 0'
 #| label: fig-mbec-fraction
 #| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
@@ -561,6 +594,13 @@ this_totals <- display_totals(timeseries, this_species, raw_mmyo)
 #| label: fig-mmyo-global
 #| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
 this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_mmyo$total > 0)'
+#| label: fig-mmyo-type
+#| fig-cap: !expr 'sprintf(flanders_type_cap, this_name)'
+display_flanders_type(flanders_type, this_species)
 ```
 
 ```{r}
@@ -608,6 +648,13 @@ this_flanders <- display_flanders(flanders, this_species)
 ```
 
 ```{r}
+#| eval: !expr 'any(raw_pipspec$total > 0)'
+#| label: fig-pipspec-type
+#| fig-cap: !expr 'sprintf(flanders_type_cap, this_name)'
+display_flanders_type(flanders_type, this_species)
+```
+
+```{r}
 #| eval: !expr 'any(raw_pipspec$total > 0) && nrow(this_totals) > 0'
 #| label: fig-pipspec-fraction
 #| fig-cap: !expr 'sprintf(fraction_cap, this_name, params$name)'
@@ -634,6 +681,13 @@ this_totals <- display_totals(timeseries, this_species, raw_pauraus)
 #| label: fig-pauraus-global
 #| fig-cap: !expr 'sprintf(flanders_cap, this_name)'
 this_flanders <- display_flanders(flanders, this_species)
+```
+
+```{r}
+#| eval: !expr 'any(raw_pauraus$total > 0)'
+#| label: fig-pauraus-type
+#| fig-cap: !expr 'sprintf(flanders_type_cap, this_name)'
+display_flanders_type(flanders_type, this_species)
 ```
 
 ```{r}
@@ -732,3 +786,70 @@ this_name <- display_intro(this_species, species)
 #| fig-cap: !expr 'object_cap(this_name, params$name, timeseries)'
 this_totals <- display_totals(timeseries, this_species, raw_cspec)
 ```
+
+## Beknopte uitleg over de figuren {#sec-uitleg}
+
+We geven enkel resultaten voor de soorten we aantroffen in `r params$name`.
+Per soort tonen we maximaal vier figuren.
+Welke figuren we tonen, hangt af de aanwezigheid van de soort in dit winterverblijf en in Vlaanderen.
+Is een soort te zeldzaam in Vlaanderen, dan kunnen we geen betrouwbare trendanalyse uitvoeren.
+Hetzelfde geldt voor soorten die we niet tot op naam konden brengen.
+Voor deze soorten tonen we enkel de figuur type Ia (@sec-type-Ia).
+
+Wanneer we voldoende gegevens hebben om een betrouwbare trendanalyse uit te voeren, tonen we twee bijkomende figuren (type II, @sec-type-II en type III, @sec-type-III).
+
+Wanneer de soort binnen deze winterverblijf voldoende aanwezig is om ze te gebruiken bij de analyse op het niveau van Vlaanderen, tonen we een derde figuur (type III, @sec-type-III) en gebruiken we voor de eerste figuur type Ib (@sec-type-Ib) i.p.v. type Ia.
+
+### Figuur type Ia {#sec-type-Ia}
+
+Deze figuur toont de waargenomen aantallen van de soort in `r params$name` over de tijd.
+Elk punt heeft het totaal van de soort weer tijdens een bepaalde winter.
+Meerdere tellingen tijdens dezelfde winter staan dan boven elkaar.
+Merk op dat deze tellingen niet gebruikt zijn voor de trendanalyse.
+
+### Figuur type Ib {#sec-type-Ib}
+
+Deze figuur gebruikt de type Ia figuur als basis.
+De kleur van de punten geeft nu aan of de telling gebruikt is in de trendanalyse of niet.
+Omdat dit winterverblijf gebruikt is in de trendanalyse op Vlaams niveau, kunnen we ontbrekende tellingen bijschatten.
+Hierbij kan zowel gaan over tellingen die volledig ontbreken als over tellingen die slechts gedeeltelijk uitgevoerd zijn.
+Bijgevolg is het totaal na bijschatting nooit kleiner dan het waargenomen aantal.
+De totalen na bijschatting geven we weer als een lijn en drie gekleurde banden.
+De lijn geeft het geschatte totaal weer.
+De gekleurde banden geven de onzekerheid van dit geschatte totaal weer.
+De donkerste band geeft het 30%-geloofwaardigheidsinterval weer, de middelste band het 60%-geloofwaardigheidsinterval en de lichtste band het 90%-geloofwaardigheidsinterval.
+Hoe breder de band, hoe groter de onzekerheid.
+Wanneer het winterverblijf volledig geteld is, dan is er geen onzekerheid en vallen de lijn en de banden samen met de punten (die gebruikt zijn in de analyse).
+
+### Figuur type II {#sec-type-II}
+
+Deze figuur bevat een lijn en drie gekleurde banden.
+De lijn geeft de geschatte totale populatie over alle winterverblijven weer na bijschatting van de niet-getelde (delen van) winterverblijven.
+De gekleurde banden geven de onzekerheid rond de geschatte totalen weer.
+De donkerste band geeft het 30%-geloofwaardigheidsinterval weer, de middelste band het 60%-geloofwaardigheidsinterval en de lichtste band het 90%-geloofwaardigheidsinterval.
+Hoe breder de band, hoe groter de onzekerheid.
+Hoe groter het aandeel niet-getelde (delen van) winterverblijven, hoe breder de band.
+Hoe moeilijker de aantallen van de soort te voorspellen zijn, hoe breder de band.
+
+### Figuur type III {#sec-type-III}
+
+Het principe van deze figuur is gelijk aan dat van figuur type II.
+Het enige verschil is dat we de resultaten opsplitsen per type winterverblijf.
+We onderscheiden volgende types:
+
+- "fort": alle grote militaire objecten.
+  Hoofdzakelijk de forten en schansen uit de fortengordels rond Antwerpen.
+  Ook forten daarbuiten zoals Fort Leopold (Diest) en het Kezelfort (Oudenaarde).
+- "groeve": de mergelgroeves in Zuid-Limburg
+- "overige groot": alle andere winterverblijven die opgedeeld zijn in deellocaties en geen fort of groeve zijn.
+  Bijvoorbeeld de steenoven in Turnhout.
+- "klein": alle winterverblijven die niet opgedeeld zijn in deellocaties.
+  Meestal kleinere winterverblijven zoals ijskelders, bunkers, kelders van kastelen, ...
+
+Dit winterverblijf rekenen we tot de groep "`r location_type`".
+
+### Figuur type IV {#sec-type-IV}
+
+Deze figuur toont de verhouding van de aantallen in deze winterverblijf in verhouding met de totale aantallen in Vlaanderen.
+De lijn geeft de gemiddelde schatting van de verhouding weer.
+De gekleurde banden geven de onzekerheid rond de geschatte verhouding weer.

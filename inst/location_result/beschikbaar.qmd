@@ -5,6 +5,7 @@ params:
   location: 20352
   name: Fort Lier (3010)
   n_winter: 24
+  detail: false
 ---
 
 # Overzicht van de beschikbare tellingen
@@ -30,27 +31,20 @@ raw_visits <- verify_vc(
   "visit_type", root = ".", variables = c("visit_id", "type", "score")
 )
 raw_visits |>
-  filter(.data$location_id == params$location) |>
+  filter(
+    .data$location_id == params$location,
+    str_detect(.data$type, "old", negate = TRUE)
+  ) |>
   mutate(
     visit_id = reorder(.data$visit_id, .data$date),
     detailgraad = case_when(
       .data$type == "alternative detail" ~ "alternatief detail",
       .data$type == "extra detail" ~ "bijkomend detail",
-      .data$type == "extra" ~ "bijkomend",
-      .data$type %in% c("total_detail", "extra total") ~
-        "bijkomend",
-      .data$type == "old detail" ~ "oud detail",
-      .data$type %in% "old total" ~ "oud totaal",
-      .data$type == "old" ~ "oud",
+      .data$type == "extra total" ~ "bijkomend totaal",
       .data$level == "detail" & .data$type == "detail" ~ "bruikbaar detail",
       .data$level == "mixed" & .data$type == "detail" ~
         "bruikbaar detail als totaal",
-      .data$level == "rare" & .data$type == "detail" ~
-        "nog niet bruikbaar detail",
-      .data$level == "rare" & .data$type == "total" ~ 
-        "nog niet bruikbaar totaal",
-      .data$type == "rare" ~ "nog niet bruikbaar",
-      .data$type == "potential" ~ "bruikbaar",
+      is.na(.data$level) & .data$type == "total" ~ "bruikbaar totaal",
       .data$level == "mixed" & .data$type == "total" ~ "bruikbaar totaal",
       .data$level == "detail" & .data$type == "total" ~ "niet gebruikt totaal",
       TRUE ~ NA_character_
@@ -59,9 +53,7 @@ raw_visits |>
         levels = c(
           "bruikbaar detail", "bruikbaar detail als totaal",
           "bruikbaar totaal", "bruikbaar", "alternatief detail",
-          "nog niet bruikbaar detail", "nog niet bruikbaar totaal",
-          "bijkomend detail", "bijkomend totaal", "bijkomend",
-          "niet gebruikt totaal", "oud detail", "oud totaal", "oud"
+          "bijkomend detail", "bijkomend totaal", "niet gebruikt totaal"
         )
       )
   ) |>
@@ -93,9 +85,10 @@ In @fig-overzicht-bruikbaar geven we een overzicht van de beschikbare tellingen 
 We splitsen deze tellingen op in een aantal categorieën naargelang hun bruikbaarheid voor de analyse op Vlaams niveau.
 De analyse slaat telkens op de afgelopen `r params$n_winter` winters.
 Oudere tellingen gebruiken we niet momenteel niet voor deze analyse.
-Verder moeten we van een winterverblijf over minstens 4 winters met een bruikbare telling beschikken om bruikbaar te zijn voor de analyse.
-Een winterverblijf met minder dan 4 winters met tellingen tijdens de afgelopen `r params$n_winter` winters is nog niet bruikbaar.
+Vandaar dat we deze niet weergeven in de figuur.
 Indien meerdere tellingen per winter beschikbaar zijn, dan gebruiken we de telling het dichtst bij 15 januari.
+
+::: {.content-hidden unless-meta="params.detail"}
 
 Grote winterverblijven delen we op in meerdere deellocaties.
 Deze deellocaties worden afzonderlijk geteld.
@@ -108,11 +101,20 @@ Hebben we meerdere tellingen per winter, dan geven we eerst voorrang aan de tell
 Alternatieve detailtellingen zijn detailtellingen die op minder dan 10 dagen van een bruikbare detailtellingen liggen.
 We kunnen deze tellingen gebruiken indien de bruikbare telling bepaalde deellocaties niet omvat.
 In de praktijk is dit enkel relevant wanneer een telling over meerdere dagen gespreid werd.
+:::
+
+```{r}
+#| label: cap-format
+bruikbaar_cap <- paste(
+  "Overzicht beschikbare tellingen in",
+  "[meetnetten.be](https://www.meetnetten.be) tijdens de laatste %i winters."
+) |>
+  sprintf(params$n_winter)
+```
 
 ```{r}
 #| label: fig-overzicht-bruikbaar
-#| fig.cap: Overzicht beschikbare tellingen in
-#|   [meetnetten.be](https://www.meetnetten.be)
+#| fig.cap: !expr 'bruikbaar_cap'
 #| fig-height: 2
 #| fig-width: 7
 ggplot(visits, aes(x = visit_id, y = 1, fill = detailgraad)) +
@@ -128,7 +130,7 @@ ggplot(visits, aes(x = visit_id, y = 1, fill = detailgraad)) +
 We berekenen een monitoringsscore op basis van de winters met bruikbare tellingen tijdens de afgelopen `r params$n_winter` winters.
 Deze score loopt van 0% tot 100%.
 Een score van 100% betekent dat we van alle afgelopen `r params$n_winter` winters een bruikbare telling hebben.
-Recenter winters krijgen een hogere gewicht in de scoreberekening.
+Recenter winters krijgen een hoger gewicht in de scoreberekening.
 Op die manier stimuleren we dat winterverblijven regelmatig geteld worden.
 Is het winterverblijf opgedeeld in deellocaties, dan krijgen tellingen op totaalniveau slechts de helft van de score die tellingen op detailniveau krijgen.
 Op die manier stimuleren we om de tellingen op detailniveau in te voeren.
@@ -206,20 +208,14 @@ scores |>
   kable()
 ```
 
-```{r}
-#| eval: !expr '!is.na(visits$level[1])'
-#| results: 'asis'
-"In @fig-overzicht-deellocaties geven we een overzicht van de tellingen op het
-niveau van de deellocaties.
+::: {.content-hidden unless-meta="params.detail"}
+
+In @fig-overzicht-deellocaties geven we een overzicht van de tellingen op het niveau van de deellocaties.
 Op de x-as van de figuur staan de tellingen met hun datum.
 Op de y-as van de figuur staan de deellocaties in alfabetisch volgorde.
-We geven de namen bewust niet mee omdat sommige objecten een zeer groot aantal
-deellocaties hebben.
+We geven de namen bewust niet mee omdat sommige objecten een zeer groot aantal deellocaties hebben.
 Het doel van deze figuur is de niet-getelde deellocaties duidelijk te maken.
-Dit zijn de witte vlakken in de figuur." |>
-  cat()
-```
-
+Dit zijn de witte vlakken in de figuur.
 
 ```{r}
 #| label: fig-overzicht-deellocaties
@@ -260,6 +256,9 @@ ggplot(missing_sublocation, aes(x = date, y = name, fill = detailgraad)) +
   geom_tile() +
   theme(
     axis.title = element_blank(), axis.text.x = element_text(angle = 90),
-    axis.text.y = element_blank(), panel.grid = element_blank()
+    axis.text.y = element_text(size = 2), panel.grid = element_blank(),
+    axis.ticks.y = element_blank()
   )
 ```
+
+:::

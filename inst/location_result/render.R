@@ -2,30 +2,42 @@ library(batanalysis)
 library(git2rdata)
 library(quarto)
 library(tidyverse)
-dataroot <- keyring::key_get(service = "result_path", keyring = "batanalysis")
-resultroot <- keyring::key_get(
-  service = "target_path",
-  keyring = "batanalysis_data"
-)
+dataroot <- keyring::key_get("meetnetten", "batanalysis_data")
+resultroot <- keyring::key_get("meetnetten", "batanalysis_result")
 
-relevant_visit <- list_relevant_visit(data_root)
+relevant_visit <- visit_type(dataroot)
 write_vc(
   x = relevant_visit,
-  file = "relevant_visit",
+  file = "visit_type",
   root = ".",
   sorting = "visit_id",
-  digits = 10
+  digits = 5,
+  optimize = FALSE,
+  strict = FALSE
 )
 
 relevant_visit |>
-  filter(.data$date >= Sys.Date() - 24 * 365) |>
-  slice_max(.data$total, n = 1, with_ties = FALSE, by = "location_id") |>
+  count(.data$location_id, .data$date) |>
+  filter(n > 1) |>
   inner_join(
     file.path("data", "hibernation", "locations") |>
       verify_vc(root = dataroot, variables = c("id", "name")),
     by = c("location_id" = "id")
   ) |>
-  arrange(desc(.data$total)) |>
+  select(name, date, n) |>
+  arrange(name, desc(date)) |>
+  write_csv("duplicate_visits.csv")
+
+relevant_visit |>
+  filter(!is.na(.data$score)) |>
+  group_by(.data$location_id) |>
+  summarise(score = sum(.data$score), small = mean(is.na(.data$level))) |>
+  inner_join(
+    file.path("data", "hibernation", "locations") |>
+      verify_vc(root = dataroot, variables = c("id", "name")),
+    by = c("location_id" = "id")
+  ) |>
+  arrange(desc(.data$score)) |>
   transmute(
     .data$location_id,
     code = ifelse(
@@ -45,11 +57,14 @@ relevant_visit |>
       .data$code,
       sprintf("%s (%s)", .data$name, .data$code)
     ),
-    .data$total
+    .data$score,
+    detail = .data$small == 0
   ) -> to_do
 
 dir.create("reports", showWarnings = FALSE)
-template <- readLines("_quarto.yml")
+file.path("location_result", "_quarto.yml") |>
+  system.file(package = "batanalysis") |>
+  readLines() -> template
 for (i in seq_len(nrow(to_do))) {
   message(to_do$name[i])
   target <- file.path(
@@ -72,7 +87,8 @@ for (i in seq_len(nrow(to_do))) {
       data = dataroot,
       result = resultroot,
       location = to_do$location_id[i],
-      name = to_do$name[i]
+      name = to_do$name[i],
+      detail = to_do$detail[i]
     )
   )
   list.files("output", pattern = ".pdf$", full.names = TRUE) |>

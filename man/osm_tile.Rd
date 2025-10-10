@@ -28,7 +28,7 @@ or \link[osmdata]{bbox_to_string} with a \code{data.frame} from \code{getbb(...,
 
 \item{type}{Character; type of map to download.
 Options are \code{"osm"} (OpenStreetMap, default) and
-\code{"water"} (watercolor style from Stadia Maps)}
+\code{"water"} (watercolour style from Stadia Maps)}
 }
 \description{
 return OSM raster tiles for a given bounding box

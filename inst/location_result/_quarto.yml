@@ -21,7 +21,6 @@ book:
     - toestand.qmd
     - beschikbaar.qmd
     - resultaten.qmd
-    - locatie.qmd
 
 flandersqmd:
   entity: INBO

@@ -5,14 +5,8 @@ params:
   location: 20502
   name: Fort Lier (3010)
   n_winter: 24
+  detail: false
 ---
-
-# Overzicht van de huidige toestand
-
-In @fig-recent geven we een overzicht van het totaal aantal per soort voor `r params$name` tijdens de meest recente beschikbare telling.
-Indien de balk deels transparant is, dan is dat een indicatie dat het winterverblijf tijdens de laatste winter niet (volledig) onderzocht is.
-Op dat ogenblik doen we een schatting op basis van de beschikbare statistische modellen.
-Hoe donkerder de band hoe meer zekerheid we hebben dat dat bepaalde aantal vleermuizen minstens aanwezig is.
 
 ```{r}
 #| label: setup
@@ -33,10 +27,10 @@ result_root <- repository(params$result)
 #| label: read-data
 verify_vc(
   "visit_type", root = ".", variables = c("visit_id", "type", "score")
-) |> 
+) |>
   filter(.data$location_id == params$location) |>
   mutate(
-    analyse = (is.na(.data$level) & .data$type == "potential") |
+    analyse = (is.na(.data$level) & .data$type == "total") |
       .data$level != "rare" & .data$type == "detail" |
       .data$level == "mixed" & .data$type == "total"
   ) |>
@@ -105,9 +99,9 @@ if (relevant$type == "detail") {
 }
 file.path("hibernation", "total_location") |>
   verify_vc(
-    root = result_root, variables = c("species", "location", "winter")
+    root = result_root, variables = c("species", "location_id", "winter")
   ) |>
-  semi_join(relevant, by = c("location" = "location_id", "winter")) |>
+  semi_join(relevant, by = c("location_id", "winter")) |>
   select("species", "winter", "mean", starts_with("p")) |>
   left_join(x = observed, by = "species") |>
   mutate(
@@ -120,13 +114,33 @@ file.path("hibernation", "total_location") |>
         sprintf("%.1f, (%.1f; %.1f)", .data$mean, .data$p05, .data$p95)
       )
     ),
-    across(starts_with("p"), ~ ifelse(is.na(.x), .data$observed, .x))
+    across(starts_with("p"), ~ ifelse(is.na(.x), .data$observed, .x)),
+    winter = replace_na(.data$winter, relevant$winter)
   ) |>
   inner_join(species, by = c("species" = "code")) |>
   mutate(
     name = reorder(.data$name, .data$p50),
     position = ifelse(.data$p95 < 0.5 * max(.data$p95), -0.2, 1.2)
   ) -> recent
+```
+
+# Overzicht van de huidige toestand
+
+In @fig-recent geven we een overzicht van het totaal aantal per soort voor `r params$name` tijdens de meest recente beschikbare telling.
+
+```{r}
+#| label: imputation
+#| eval: !expr 'any(recent$p05 < recent$p95)'
+#| result: "markdown"
+paste(
+  "Indien de balk deels transparant is, dan is dat een indicatie dat het",
+  "winterverblijf tijdens de laatste winter niet (volledig) onderzocht is.",
+  "Op dat ogenblik doen we een schatting op basis van de beschikbare",
+  "statistische modellen.",
+  "Hoe donkerder de band hoe meer zekerheid we hebben dat dat bepaalde aantal",
+  "vleermuizen minstens aanwezig is."
+) |>
+  cat()
 ```
 
 ```{r}
@@ -136,7 +150,7 @@ toestand_cap <- "De totalen per soort voor %s tijdens de winter van %i."
 
 ```{r}
 #| label: fig-recent
-#| fig.cap: !expr 'sprintf(toestand_cap, params$name, recent$winter)'
+#| fig.cap: !expr 'sprintf(toestand_cap, params$name, relevant$winter)'
 recent |>
   ggplot(aes(x = name)) +
   geom_bar(stat = "identity", aes(y = p05), alpha = 0.2) +

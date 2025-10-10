@@ -4,7 +4,7 @@
 #' @param cache_path File location to cache maps
 #' @param type Character; type of map to download.
 #' Options are `"osm"` (OpenStreetMap, default) and
-#' `"water"` (watercolor style from Stadia Maps)
+#' `"water"` (watercolour style from Stadia Maps)
 #' @export
 #' @importFrom assertthat assert_that has_name is.number noNA
 #' @importFrom curl curl_download handle_setheaders new_handle

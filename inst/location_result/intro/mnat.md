@@ -1,7 +1,7 @@
 ::: {lang=nl-BE}
 ## Franjestaart
 
-De Franjestraat (_[Myotis natteri]{lang=sc-WO}_) is moeilijk waarneembaar tijdens de zomer.
+De Franjestraat (_[Myotis nattereri]{lang=sc-WO}_) is moeilijk waarneembaar tijdens de zomer.
 Hierdoor is er weinig over deze soort gekend.
 In Vlaanderen is ze vermoedelijk zeldzaam en komt ze vooral lokaal voor.
 Deze soort is een typische bewoner van gemengde oude beuken- en eikenbossen.
