@@ -650,6 +650,7 @@ prepare_analysis_model_species <- function(
       return(NULL)
     }
     stopifnot(requireNamespace("INLA", quietly = TRUE))
+    stopifnot(requireNamespace("Matrix", quietly = TRUE))
     stopifnot(requireNamespace("n2kanalysis", quietly = TRUE))
     if (max(apply(model@AggregatedImputed@Imputation, 1, min)) < 5) {
       return(NULL)
@@ -667,10 +668,10 @@ prepare_analysis_model_species <- function(
     length(winters) |>
       diag() |>
       list() |>
-      setNames("cwinter") |>
+      stats::setNames("cwinter") |>
       c("(Intercept)" = list(rep(1, length(winters)))) |>
       INLA::inla.make.lincombs() |>
-      setNames(paste("total:", winters)) -> lc1
+      stats::setNames(paste("total:", winters)) -> lc1
     comb <- expand.grid(
       winter1 = factor(winters),
       winter2 = factor(winters)
@@ -685,9 +686,9 @@ prepare_analysis_model_species <- function(
         x = rep(c(1, -1), each = nrow(comb))
       ) |>
       list() |>
-      setNames("cwinter") |>
+      stats::setNames("cwinter") |>
       INLA::inla.make.lincombs() |>
-      setNames(comb$label) -> lc2
+      stats::setNames(comb$label) -> lc2
     n2kanalysis::moving_trend(
       n_year = length(winters),
       duration = 12,
@@ -712,7 +713,7 @@ prepare_analysis_model_species <- function(
       ) |>
       unique() -> lc3
     INLA::inla.make.lincombs(cwinter = lc3) |>
-      setNames(rownames(lc3)) -> lc3
+      stats::setNames(rownames(lc3)) -> lc3
     n2kanalysis::moving_average(
       n_year = length(winters),
       duration = 6,
@@ -727,7 +728,7 @@ prepare_analysis_model_species <- function(
       ) -> ma
     list("(Intercept)" = rep(1, nrow(ma)), cwinter = ma) |>
       INLA::inla.make.lincombs() |>
-      setNames(rownames(ma)) -> lc4
+      stats::setNames(rownames(ma)) -> lc4
     return(list(lincomb = c(lc1, lc2, lc3, lc4)))
   }
 
