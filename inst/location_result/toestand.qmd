@@ -5,7 +5,6 @@ params:
   location: 20502
   name: Fort Lier (3010)
   n_winter: 24
-  detail: false
 ---
 
 ```{r}
@@ -131,14 +130,18 @@ In @fig-recent geven we een overzicht van het totaal aantal per soort voor `r pa
 ```{r}
 #| label: imputation
 #| eval: !expr 'any(recent$p05 < recent$p95)'
-#| result: "markdown"
+#| results: "asis"
 paste(
   "Indien de balk deels transparant is, dan is dat een indicatie dat het",
-  "winterverblijf tijdens de laatste winter niet (volledig) onderzocht is.",
+  "winterverblijf tijdens deze winter niet volledig onderzocht is.",
   "Op dat ogenblik doen we een schatting op basis van de beschikbare",
   "statistische modellen.",
   "Hoe donkerder de band hoe meer zekerheid we hebben dat dat bepaalde aantal",
-  "vleermuizen minstens aanwezig is."
+  "vleermuizen minstens aanwezig is.",
+  "We geven in dat geval drie getallen weer:",
+  "het geschatte gemiddelde,",
+  "en tussen haakjes de 5%- en 95%-kwantielen van de onzekerheidsverdeling.",
+  "Hierdoor zijn kommagetallen mogelijk."
 ) |>
   cat()
 ```

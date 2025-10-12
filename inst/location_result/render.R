@@ -17,18 +17,6 @@ write_vc(
 )
 
 relevant_visit |>
-  count(.data$location_id, .data$date) |>
-  filter(n > 1) |>
-  inner_join(
-    file.path("data", "hibernation", "locations") |>
-      verify_vc(root = dataroot, variables = c("id", "name")),
-    by = c("location_id" = "id")
-  ) |>
-  select(name, date, n) |>
-  arrange(name, desc(date)) |>
-  write_csv("duplicate_visits.csv")
-
-relevant_visit |>
   filter(!is.na(.data$score)) |>
   group_by(.data$location_id) |>
   summarise(score = sum(.data$score), small = mean(is.na(.data$level))) |>
@@ -76,7 +64,17 @@ for (i in seq_len(nrow(to_do))) {
   }
   c(
     template,
-    sprintf("  title: %s\n  shorttitle: %s", to_do$name[i], to_do$filename[i])
+    paste(
+      "  title: %s",
+      paste(
+        "  subtitle: Overzicht de overwinterende vleermuizen tijdens de",
+        "periode 2002-2025"
+      ),
+      "  shorttitle: %s",
+      sep = "\n"
+    ) |>
+      sprintf(to_do$name[i], to_do$filename[i]),
+    "  detail: true"[to_do$detail[i]]
   ) |>
     writeLines("_quarto.yml")
   quarto_render(
@@ -87,8 +85,7 @@ for (i in seq_len(nrow(to_do))) {
       data = dataroot,
       result = resultroot,
       location = to_do$location_id[i],
-      name = to_do$name[i],
-      detail = to_do$detail[i]
+      name = to_do$name[i]
     )
   )
   list.files("output", pattern = ".pdf$", full.names = TRUE) |>

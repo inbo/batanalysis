@@ -5,7 +5,6 @@ params:
   location: 20352
   name: Fort Lier (3010)
   n_winter: 24
-  detail: false
 ---
 
 # Overzicht van de beschikbare tellingen
@@ -48,7 +47,7 @@ raw_visits |>
       .data$level == "mixed" & .data$type == "total" ~ "bruikbaar totaal",
       .data$level == "detail" & .data$type == "total" ~ "niet gebruikt totaal",
       TRUE ~ NA_character_
-    ) |>
+     ) |>
       factor(
         levels = c(
           "bruikbaar detail", "bruikbaar detail als totaal",
@@ -173,10 +172,7 @@ visits |>
     data = badges,
     aes(xmin = score, xmax = score_max, ymin = -Inf, ymax = Inf, fill = badge)
   ) +
-  geom_rect(
-    aes(xmin = x0, xmax = x, ymin = 0, ymax = 1), fill = NA,
-    colour = inbo_steun_blauw
-  ) +
+  geom_rect(aes(xmin = x0, xmax = x, ymin = 0, ymax = 1), fill = NA, colour = inbo_steun_blauw) +
   geom_label_repel(
     aes(x = (x + x0) / 2, y = ylab, label = winter),
     colour = inbo_hoofd,
@@ -203,7 +199,7 @@ visits |>
 
 ```{r}
 #| label: tbl-overzicht-scores
-#| tbl-cap: Overzicht van de monitoringscores van alle winterverblijven in
+#| tbl-cap: Overzicht van de monitoringscores van alle winterverblijven in 
 #|   [meetnetten.be](https://www.meetnetten.be).
 scores |>
   count(.data$badge, name = "aantal") |>
@@ -211,20 +207,29 @@ scores |>
   kable()
 ```
 
-::: {.content-hidden unless-meta="params.detail"}
+::: {.content-hidden unless-meta="flandersqmd.detail"}
 
 In @fig-overzicht-deellocaties geven we een overzicht van de tellingen op het niveau van de deellocaties.
 Op de x-as van de figuur staan de tellingen met hun datum.
 Op de y-as van de figuur staan de deellocaties in alfabetisch volgorde.
-We geven de namen bewust niet mee omdat sommige objecten een zeer groot aantal deellocaties hebben.
 Het doel van deze figuur is de niet-getelde deellocaties duidelijk te maken.
 Dit zijn de witte vlakken in de figuur.
+
+We zetten de namen bewust zeer klein omdat sommige winterverblijven uit zeer veel deellocaties kunnen bestaan.
+Je kan in de pdf inzoomen om de namen beter te kunnen lezen.
+Merk op dat bij een alfabetische sorting "KZ10" tussen "KZ1" en "KZ2" komt te staan.
+Eventueel kan je de naam van de deellocaties in de databank (laten) aanpassen om een betere sortering te bekomen.
+In dit voorbeeld kan je bijvoorbeeld "KZ1" en "KZ2" hernoemen naar "KZ01" en "KZ02".
+
+Als er een wit vlak staat, gaan we er vanuit dat a) de deellocatie niet geteld is en b) de deellocatie op dat moment wel toegankelijk was voor vleermuizen.
+We weten dat dit laatste niet altijd het geval is.
+Voor dergelijke locaties moeten de tellers ons laten weten vanaf welke datum de deellocatie toegankelijk was voor vleermuizen (nieuwe deellocaties) of vanaf welke datum de deellocatie niet meer toegankelijk was voor vleermuizen (deellocaties die vleermuizen niet meer kunnen gebruiken).
 
 ```{r}
 #| label: fig-overzicht-deellocaties
 #| fig.cap: Overzicht van de deellocaties met beschikbare tellingen
 #| fig.height: 9
-#| eval: !expr '!is.na(visits$level[1])'
+#| eval: !expr 'TRUE || !is.na(visits$level[1])'
 file.path("data", "hibernation", "samples") |>
   verify_vc(root = data_root, variables = c("sublocation_id", "visit_id")) |>
   left_join(

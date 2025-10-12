@@ -5,7 +5,6 @@ params:
   location: 20352
   name: Fort Lier (3010)
   n_winter: 24
-  detail: false
 ---
 
 ```{r}
@@ -31,6 +30,9 @@ display_intro <- function(this_species, species) {
     cat(sep = "\n")
   species$name[species$species == this_species]
 }
+major_breaks <- function(x) {
+  unique(round(pretty(x, n = 5)))
+}
 display_totals <- function(timeseries, this_species, raw_data) {
   stopifnot(require("dplyr"), require("ggplot2"))
   timeseries |>
@@ -43,14 +45,14 @@ display_totals <- function(timeseries, this_species, raw_data) {
     ) |>
     mutate(analyse = !is.na(.data$p50)) |>
     arrange(.data$analyse, .data$winter) -> raw_data
-  p <- ggplot(this_totals, aes(x = .data$winter, y = .data$mean)) +
+  p <- ggplot(this_totals, aes(x = winter, y = mean)) +
     geom_point(data = raw_data, aes(y = .data$total, colour = .data$analyse)) +
     geom_ribbon(aes(ymin = .data$p05, ymax = .data$p95), alpha = 0.25) +
     geom_ribbon(aes(ymin = .data$p20, ymax = .data$p80), alpha = 0.33) +
     geom_ribbon(aes(ymin = .data$p35, ymax = .data$p65), alpha = 0.5) +
     geom_line() +
-    scale_x_continuous(breaks = breaks_pretty()) +
-    scale_y_continuous(breaks = breaks_pretty()) +
+    scale_x_continuous(breaks = major_breaks) +
+    scale_y_continuous(breaks = major_breaks, limits = c(0, NA)) +
     scale_colour_discrete(
       name = "in analyse", breaks = c(TRUE, FALSE), labels = c("ja", "nee")
     ) +
@@ -92,16 +94,10 @@ display_flanders_type <- function(flanders_type, this_species) {
   flanders_type |>
     filter(.data$species == this_species) -> this_flanders_type
   p <- ggplot(this_flanders_type, aes(x = .data$winter)) +
-    geom_ribbon(
-      aes(ymin = .data$p05, ymax = .data$p95, fill = .data$type), alpha = 0.25
-    ) +
-    geom_ribbon(
-      aes(ymin = .data$p20, ymax = .data$p80, fill = .data$type), alpha = 0.33
-    ) +
-    geom_ribbon(
-      aes(ymin = .data$p35, ymax = .data$p65, fill = .data$type), alpha = 0.5
-    ) +
-    geom_line(aes(y = mean, colour = .data$type)) +
+    geom_ribbon(aes(ymin = .data$p05, ymax = .data$p95, fill = type), alpha = 0.25) +
+    geom_ribbon(aes(ymin = .data$p20, ymax = .data$p80, fill = type), alpha = 0.33) +
+    geom_ribbon(aes(ymin = .data$p35, ymax = .data$p65, fill = type), alpha = 0.5) +
+    geom_line(aes(y = mean, colour = type)) +
     scale_x_continuous() +
     scale_y_continuous(limits = c(0, NA)) +
     theme(axis.title = element_blank())
@@ -355,7 +351,11 @@ species |>
 ```{r}
 #| label: missing-species
 #| eval: !expr 'nrow(missing_species) > 0'
-missing_species
+#| results: "asis"
+paste(missing_species$name, collapse = ", ") |>
+  sprintf(fmt = "In dit rapport ontbrekend volgende soorten: %s.") |>
+  c("Gelieve deze te melden aan de auteurs.") |>
+  cat(sep = "\n")
 ```
 
 ```{r}
@@ -506,7 +506,7 @@ display_ratio(fractions = fractions, this_species = this_species)
 #| eval: !expr 'any(raw_mdas$total > 0)'
 #| label: intro-mdas
 #| results: asis
-this_species <- "mdas"
+this_species <- "Mdas"
 this_name <- display_intro(this_species, species)
 ```
 
@@ -820,6 +820,7 @@ De gekleurde banden geven de onzekerheid van dit geschatte totaal weer.
 De donkerste band geeft het 30%-geloofwaardigheidsinterval weer, de middelste band het 60%-geloofwaardigheidsinterval en de lichtste band het 90%-geloofwaardigheidsinterval.
 Hoe breder de band, hoe groter de onzekerheid.
 Wanneer het winterverblijf volledig geteld is, dan is er geen onzekerheid en vallen de lijn en de banden samen met de punten (die gebruikt zijn in de analyse).
+Op het einde van de tijdreeks is er altijd onzekerheid omdat we daar een voorspelling voor de volgende winter geven.
 
 ### Figuur type II {#sec-type-II}
 
@@ -830,6 +831,7 @@ De donkerste band geeft het 30%-geloofwaardigheidsinterval weer, de middelste ba
 Hoe breder de band, hoe groter de onzekerheid.
 Hoe groter het aandeel niet-getelde (delen van) winterverblijven, hoe breder de band.
 Hoe moeilijker de aantallen van de soort te voorspellen zijn, hoe breder de band.
+Op het einde van de tijdreeks is er altijd onzekerheid omdat we daar een voorspelling voor de volgende winter geven.
 
 ### Figuur type III {#sec-type-III}
 
