@@ -19,6 +19,10 @@ if (file_test("-d", target)) {
   target <- git2r::init(target)
 }
 import_raw_data(origin = origin, target = target, strict = FALSE)
+dups <- duplicate_visit(origin)
+write.csv2(dups$sublocation, "problem_sublocation.csv", row.names = FALSE)
+write.csv2(dups$location, "problem_location.csv", row.names = FALSE)
+write.csv2(dups$clean, "problem_clean.csv", row.names = FALSE)
 DBI::dbDisconnect(origin)
 
 analysis_data <- "../batanalysis_analysis"
