@@ -4,6 +4,18 @@ library(quarto)
 library(tidyverse)
 dataroot <- keyring::key_get("meetnetten", "batanalysis_data")
 resultroot <- keyring::key_get("meetnetten", "batanalysis_result")
+outputroot <- keyring::key_get("meetnetten", "batanalysis_output")
+
+file.path(outputroot, "intro") |>
+  dir.create(showWarnings = FALSE, recursive = TRUE)
+source_dir <- system.file("location_result", package = "batanalysis")
+source_files <- list.files(source_dir, recursive = TRUE)
+file.path(source_dir, source_files) |>
+  file.copy(file.path(outputroot, source_files), overwrite = TRUE)
+
+oldwd <- getwd()
+on.exit(setwd(oldwd))
+setwd(outputroot)
 
 relevant_visit <- visit_type(dataroot)
 write_vc(
@@ -34,12 +46,7 @@ relevant_visit |>
       .data$code
     ),
     name = str_remove(.data$name, "^[0-9]{4}(\\s*\\(.*?\\))?\\s*-\\s*"),
-    filename = ifelse(.data$name == "", .data$code, .data$name) |>
-      tolower() |>
-      str_replace_all(" ", "-") |>
-      str_replace_all("-+", "-") |>
-      str_remove_all("[,;/'\\(\\)\\.]") |>
-      sprintf(fmt = "%2$i-%1$s", .data$location_id),
+    filename = sprintf("%i-overzicht", .data$location_id),
     name = ifelse(
       .data$name == "",
       .data$code,
@@ -67,7 +74,7 @@ for (i in seq_len(nrow(to_do))) {
     paste(
       "  title: %s",
       paste(
-        "  subtitle: Overzicht de overwinterende vleermuizen tijdens de",
+        "  subtitle: Overzicht van de overwinterende vleermuizen tijdens de",
         "periode 2002-2025"
       ),
       "  shorttitle: %s",

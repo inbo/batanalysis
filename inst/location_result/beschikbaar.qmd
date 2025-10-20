@@ -47,7 +47,7 @@ raw_visits |>
       .data$level == "mixed" & .data$type == "total" ~ "bruikbaar totaal",
       .data$level == "detail" & .data$type == "total" ~ "niet gebruikt totaal",
       TRUE ~ NA_character_
-     ) |>
+    ) |>
       factor(
         levels = c(
           "bruikbaar detail", "bruikbaar detail als totaal",
@@ -109,6 +109,13 @@ bruikbaar_cap <- paste(
   "[meetnetten.be](https://www.meetnetten.be) tijdens de laatste %i winters."
 ) |>
   sprintf(params$n_winter)
+hist_cap <- paste(
+  "Histogram van de monitoringsscores op basis van beschikbare tellingen in",
+  "[meetnetten.be](https://www.meetnetten.be).",
+  "De score van %s bedraagt %s.",
+  "We duiden dit in de figuur aan met een verticale stippellijn."
+) |>
+  sprintf(params$name, this_score$tekst)
 ```
 
 ```{r}
@@ -142,13 +149,8 @@ Het winterverblijf staat daarmee op plaats `r this_score$rang`.
 
 ```{r}
 #| label: fig-overzicht-score
-#| fig.cap: Monitoringsscore op basis van beschikbare tellingen in
-#|   [meetnetten.be](https://www.meetnetten.be).
-#|   Elke rechthoek heeft een breedte die overeenkomt met de score van een
-#|   bepaalde winter.
-#|   Winters zonder bruikbare telling geven we niet weer omdat ze niet bijdragen
-#|   aan de score.
-#| fig-height: 2
+#| fig.cap: !expr 'hist_cap'
+#| fig-height: 4
 #| fig-width: 7
 badges <- data.frame(
   score = c(
@@ -158,53 +160,30 @@ badges <- data.frame(
   kleur = c("#8C7853", "#E6E8FA", "#FFD700")
 ) |>
   mutate(score_max = lead(.data$score, 1, 1)) -> badges
-visits |>
-  filter(.data$score > 0) |>
-  distinct(.data$winter, .data$score) |>
-  arrange(desc(.data$winter)) |>
-  mutate(
-    x = cumsum(.data$score),
-    x0 = lag(.data$x, 1, 0),
-    ylab = (row_number() %% 3) / 4 + 0.25
-  ) |>
-  ggplot() +
+ggplot(scores, aes(x = score)) +
   geom_rect(
     data = badges,
-    aes(xmin = score, xmax = score_max, ymin = -Inf, ymax = Inf, fill = badge)
+    aes(xmin = score, xmax = score_max, ymin = 0, ymax = Inf, fill = badge),
+    colour = NA
   ) +
-  geom_rect(aes(xmin = x0, xmax = x, ymin = 0, ymax = 1), fill = NA, colour = inbo_steun_blauw) +
-  geom_label_repel(
-    aes(x = (x + x0) / 2, y = ylab, label = winter),
-    colour = inbo_hoofd,
-    box.padding = unit(0.1, "lines"),
-    min.segment.length = 0.1,
-    max.overlaps = Inf,
-    size = unit(2.5, "lines")
+  geom_histogram(binwidth = 0.01) +
+  geom_vline(
+    xintercept = this_score$score,
+    linetype = "dashed",
+    color = inbo_hoofd
   ) +
   geom_label(
     data = badges,
-    aes(x = (score + score_max) / 2, y = 1.1, label = badge),
-    size = unit(3, "lines")
+    aes(x = (score + score_max) / 2, y = Inf, label = badge),
+    size = unit(3, "lines"),
+    vjust = 1.1
   ) +
-  scale_x_continuous(limits = 0:1, labels = percent) +
   scale_fill_manual(
     values = setNames(badges$kleur, badges$badge),
     guide = "none"
   ) +
-  theme(
-    axis.title = element_blank(), axis.text.y = element_blank(),
-    axis.ticks.y = element_blank(), panel.grid = element_blank()
-  )
-```
-
-```{r}
-#| label: tbl-overzicht-scores
-#| tbl-cap: Overzicht van de monitoringscores van alle winterverblijven in 
-#|   [meetnetten.be](https://www.meetnetten.be).
-scores |>
-  count(.data$badge, name = "aantal") |>
-  arrange(.data$badge) |>
-  kable()
+  scale_x_continuous(limits = 0:1, labels = percent) +
+  theme(axis.title = element_blank())
 ```
 
 ::: {.content-hidden unless-meta="flandersqmd.detail"}
@@ -217,9 +196,9 @@ Dit zijn de witte vlakken in de figuur.
 
 We zetten de namen bewust zeer klein omdat sommige winterverblijven uit zeer veel deellocaties kunnen bestaan.
 Je kan in de pdf inzoomen om de namen beter te kunnen lezen.
-Merk op dat bij een alfabetische sorting "KZ10" tussen "KZ1" en "KZ2" komt te staan.
+Merk op dat bij een alfabetische sortering `KZ10` tussen `KZ1` en `KZ2` komt te staan.
 Eventueel kan je de naam van de deellocaties in de databank (laten) aanpassen om een betere sortering te bekomen.
-In dit voorbeeld kan je bijvoorbeeld "KZ1" en "KZ2" hernoemen naar "KZ01" en "KZ02".
+In dit voorbeeld kan je bijvoorbeeld `KZ1` en `KZ2` hernoemen naar `KZ01` en `KZ02`.
 
 Als er een wit vlak staat, gaan we er vanuit dat a) de deellocatie niet geteld is en b) de deellocatie op dat moment wel toegankelijk was voor vleermuizen.
 We weten dat dit laatste niet altijd het geval is.
