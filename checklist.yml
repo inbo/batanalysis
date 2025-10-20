@@ -2,17 +2,20 @@ description: Configuration file for checklist::check_pkg()
 package: yes
 allowed:
   warnings:
-  - motivation: Draft package.
-    value: |-
-      checking for code which exercises the package ... WARNING
-      No examples, no tests, no vignettes
-  notes:
   - motivation: Package not intended for CRAN.
     value: |-
-      checking CRAN incoming feasibility ... NOTE
+      checking CRAN incoming feasibility ... WARNING
       Maintainer: 'Thierry Onkelinx <thierry.onkelinx@inbo.be>'
 
       New submission
+
+      Strong dependencies not in mainstream repositories:
+        INLA, inlatools, n2kanalysis
+  - motivation: Draft package
+    value: |-
+      checking for code which exercises the package ... WARNING
+      No examples, no tests, no vignettes
+  notes: []
 required:
 - CITATION
 - DESCRIPTION
@@ -24,6 +27,7 @@ required:
 - folder conventions
 - license
 - lintr
+- organisation
 - repository secret
 - spelling
 spelling:
