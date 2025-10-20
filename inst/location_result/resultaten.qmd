@@ -811,10 +811,10 @@ Merk op dat deze tellingen niet gebruikt zijn voor de trendanalyse.
 
 Deze figuur gebruikt de type Ia figuur als basis.
 De kleur van de punten geeft nu aan of de telling gebruikt is in de trendanalyse of niet.
-Omdat dit winterverblijf gebruikt is in de trendanalyse op Vlaams niveau, kunnen we ontbrekende tellingen bijschatten.
+Omdat dit winterverblijf gebruikt is in de trendanalyse op Vlaams niveau, kunnen we een inschatting maken van de aantallen bij ontbrekende tellingen.
 Hierbij kan zowel gaan over tellingen die volledig ontbreken als over tellingen die slechts gedeeltelijk uitgevoerd zijn.
-Bijgevolg is het totaal na bijschatting nooit kleiner dan het waargenomen aantal.
-De totalen na bijschatting geven we weer als een lijn en drie gekleurde banden.
+Bijgevolg is het totaal nooit kleiner dan het waargenomen aantal van de gebruikte tellingen.
+De totalen geven we weer als een lijn en drie gekleurde banden.
 De lijn geeft het geschatte totaal weer.
 De gekleurde banden geven de onzekerheid van dit geschatte totaal weer.
 De donkerste band geeft het 30%-geloofwaardigheidsinterval weer, de middelste band het 60%-geloofwaardigheidsinterval en de lichtste band het 90%-geloofwaardigheidsinterval.
@@ -825,7 +825,7 @@ Op het einde van de tijdreeks is er altijd onzekerheid omdat we daar een voorspe
 ### Figuur type II {#sec-type-II}
 
 Deze figuur bevat een lijn en drie gekleurde banden.
-De lijn geeft de geschatte totale populatie over alle winterverblijven weer na bijschatting van de niet-getelde (delen van) winterverblijven.
+De lijn geeft de geschatte totale populatie over alle winterverblijven weer inclusief een inschatting voor van de niet-getelde (delen van) winterverblijven.
 De gekleurde banden geven de onzekerheid rond de geschatte totalen weer.
 De donkerste band geeft het 30%-geloofwaardigheidsinterval weer, de middelste band het 60%-geloofwaardigheidsinterval en de lichtste band het 90%-geloofwaardigheidsinterval.
 Hoe breder de band, hoe groter de onzekerheid.

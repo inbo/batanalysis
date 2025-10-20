@@ -1,16 +1,19 @@
 ::: {lang=nl-BE}
 ## Ingekorven vleermuis
 
-De Ingekorven vleermuis (_[Myotis emarginatus]{lang=sc-WO}_) is een zeer kwetsbare soort.
-Vanwege haar zeldzaamheid is er weinig over haar zomergedrag in Vlaanderen geweten.
-Er zijn slechts enkele kraamkolonies bekend.
+De Ingekorven vleermuis (_[Myotis emarginatus]{lang=sc-WO}_) is een vrij zeldzame soort.
+De soort wordt vooral in de winter waargenomen, en er zijn maar een tiental kolonies gekend.
+Er worden grote aantallen geteld in enkele Limburgse groeves en in forten rondom Antwerpen.
+De aantallen nemen de laatste decennia toe.
 
-Wat overwintering betreft is de Ingekorven vleermuis een veeleisende soort.
-Bovenop de "gewone" eisen die vleermuizen aan winterverblijven stellen, verkiest de ingekorven vleermuis een zeer stabiele, vrij hoge temperatuur (8-10°C).
-Vaak met een lange toegangsroute van enkele tientallen meters.
-Slechts enkele forten en mergelgroeven in Vlaanderen voldoen aan die voorwaarden.
-De Ingekorven vleermuis is bovendien een verstoringsgevoelige soort.
+In de zomer is de Ingekorven vleermuis een typische landbouwsoort.
+De soort jaagt op mestvliegen in koeienstallen, en verblijft op zolders of in stallen.
+Sommige ingekorven vleermuizen jagen eerder op spinnen in bossen.
+
+'s Winters zijn Ingekorven typische bewoners van forten, kelders, bunkers en groeves.
+Het is een veeleisende en extra verstoringsgevoelige soort.
+Ze verkiezen plekken met een zeer stabiele, vrij hoge temperatuur (8-10°C), vaak met een lange toegangsroute van enkele tientallen meters.
 De gewoonte van de soort om vrij aan het plafond te hangen maakt deze dieren nog extra kwetsbaar.
 
-Dankzij speciale bescherming (bv 's winters afsluiten) van de bekende overwinteringsplaatsen nemen de aantallen van deze vleermuis langzaam terug toe.
+De soort lijkt te profiteren van de bescherming van winterverblijfplaatsen, maar verstoring, verlies aan zomerverblijfplaatsen en insectenafnames blijven een bedreiging vormen.
 :::

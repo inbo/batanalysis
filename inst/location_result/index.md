@@ -1,29 +1,16 @@
 ::: {lang=nl-BE}
 # Woord vooraf {-}
 
-Hier komt een kort woord vooraf.
+Dit document bevat analyses en grafieken van de getelde overwinterende vleermuizen in deze winterverblijfplaats.
+Je vindt er informatie over de  tellingen, de laatst beschikbare telling, en analyses per gevonden soort.
+Deze informatie is bedoeld voor de tellers en de eigenaars. 
+We plannen elk jaar een nieuwe versie te maken, zodat de info steeds up to date is. 
 
-**Nog te doen**
+Heb je nog vragen of feedback, aarzel niet ons te contacteren via daan.dekeukeleire@inbo.be
 
-_Woord vooraf_
-
-- Wie schrijft het woord vooraf?
-- Wat moet er allemaal in?
-- Is dit een goede plaats om de nodige personen te bedanken?
-  Denk hier bij aan de eigenaars, vrijwilligers, medewerkers van INBO en Natuurpunt, ...
-
-_Info per soort_
-
-- Ze staan nu in aflopende volgorde van totale populatie in Vlaanderen.
-  Hierbij houden we de soorten wel per genus bij elkaar.
-- Wie vult de beknopte beschrijving van de soorten aan?
-- Zetten we bij elke soort een foto van de soort?
-  Zo ja, een foto van een dier in winterslaap?
-  Of eerder van een wakker dier, al dan niet vliegend?
-  Mits aanvraag via Nicole en naamsvermelding kunnen we kiezen uit de collectie van Vilda.<!-- spell-check: ignore -->
-- Zetten we bij elke soort een verspreidingskaart?
-  Op basis van GBIF data is dat doenbaar.
-  Waarnemingen.be mogelijk ook als ze een API aanbieden.<!-- spell-check: ignore -->
+Deze analyses zouden niet mogelijk zijn zonder de enorme inzet van alle vrijwillige tellers, en zonder de toestemming en gastvrijheid van de eigenaars van de winterverblijfplaatsen.
+Verder willen we ook de mensen van de vleermuizenwerkgroep, de medewerkers van Natuurpunt studie en de medewerkers van het INBO bedanken.
+Tenslotte bedanken we Lotte Gielis voor de foto op de voorpagina.
 
 <!-- spell-check: ignore:start-->
 :::: {.content-visible when-format="pdf"}
