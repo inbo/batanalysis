@@ -10,7 +10,7 @@ In de zomer is de Ingekorven vleermuis een typische landbouwsoort.
 De soort jaagt op mestvliegen in koeienstallen, en verblijft op zolders of in stallen.
 Sommige ingekorven vleermuizen jagen eerder op spinnen in bossen.
 
-'s Winters zijn Ingekorven typische bewoners van forten, kelders, bunkers en groeves.
+'s Winters zijn Ingekorven vleermuizen typische bewoners van forten, kelders, bunkers en groeves.
 Het is een veeleisende en extra verstoringsgevoelige soort.
 Ze verkiezen plekken met een zeer stabiele, vrij hoge temperatuur (8-10°C), vaak met een lange toegangsroute van enkele tientallen meters.
 De gewoonte van de soort om vrij aan het plafond te hangen maakt deze dieren nog extra kwetsbaar.

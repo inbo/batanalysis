@@ -40,21 +40,14 @@ raw_visits |>
       .data$type == "alternative detail" ~ "alternatief detail",
       .data$type == "extra detail" ~ "bijkomend detail",
       .data$type == "extra total" ~ "bijkomend totaal",
-      .data$level == "detail" & .data$type == "detail" ~ "bruikbaar detail",
+      .data$level == "detail" & .data$type == "detail" ~ "gebruikt detail",
       .data$level == "mixed" & .data$type == "detail" ~
-        "bruikbaar detail als totaal",
-      is.na(.data$level) & .data$type == "total" ~ "bruikbaar totaal",
-      .data$level == "mixed" & .data$type == "total" ~ "bruikbaar totaal",
+        "detail gebruikt als totaal",
+      is.na(.data$level) & .data$type == "total" ~ "gebruikt totaal",
+      .data$level == "mixed" & .data$type == "total" ~ "gebruikt totaal",
       .data$level == "detail" & .data$type == "total" ~ "niet gebruikt totaal",
       TRUE ~ NA_character_
-    ) |>
-      factor(
-        levels = c(
-          "bruikbaar detail", "bruikbaar detail als totaal",
-          "bruikbaar totaal", "bruikbaar", "alternatief detail",
-          "bijkomend detail", "bijkomend totaal", "niet gebruikt totaal"
-        )
-      )
+    )
   ) |>
   arrange(.data$date, .data$visit_id) -> visits
 raw_visits |>
@@ -83,23 +76,48 @@ scores |>
 In @fig-overzicht-bruikbaar geven we een overzicht van de beschikbare tellingen voor `r params$name`.
 We splitsen deze tellingen op in een aantal categorieën naargelang hun bruikbaarheid voor de analyse op Vlaams niveau.
 De analyse slaat telkens op de afgelopen `r params$n_winter` winters.
-Oudere tellingen gebruiken we niet momenteel niet voor deze analyse.
+Oudere tellingen gebruiken we momenteel niet voor deze analyse.
 Vandaar dat we deze niet weergeven in de figuur.
-Indien meerdere tellingen per winter beschikbaar zijn, dan gebruiken we de telling het dichtst bij 15 januari.
 
-::: {.content-hidden unless-meta="params.detail"}
+::: {.content-hidden when-meta="flandersqmd.detail"}
+Dit winterverblijf is niet opgedeeld in deellocaties.
+We hebben dus enkel totaaltellingen.
+Voor de analyse gebruiken we slechts een telling per winter.
+Als we voor een bepaalde winter meerdere tellingen beschikbaar hebben, kiezen we de telling die het dichtst bij 15 januari ligt omdat het aantal vleermuizen meestal het hoogst is in het midden van de winter.
+Daarom maken we in @fig-overzicht-bruikbaar een onderscheid tussen:
 
-Grote winterverblijven delen we op in meerdere deellocaties.
+- "gebruikt totaal": de telling die we in de analyse gebruiken.
+- "bijkomend totaal": bijkomende tellingen die we niet gebruiken in de analyse.
+- "ontbreekt in databank": voor deze winter hebben we momenteel geen telling in de databank.
+
+:::
+
+::: {.content-hidden unless-meta="flandersqmd.detail"}
+Grote winterverblijven delen we op in meerdere deellocaties (kamers of gangen in het geval van forten, secties in het geval van mergelgroeves).
 Deze deellocaties worden afzonderlijk geteld.
 De waarnemingen hebben we bij voorkeur per deellocatie.
-Soms hebben we enkel het totaal over het volledige winterverblijf beschikbaar.
-Daarom maken we voor de grote winterverblijven in @fig-overzicht-bruikbaar een onderscheid tussen tellingen op detailniveau (per deellocatie) en tellingen op totaalniveau (voor het volledige winterverblijf).
-Hebben we minstens 4 winters met tellingen op detailniveau en het aantal winters met tellingen op detailniveau is groter dan het aantal winters met tellingen op totaalniveau, dan gebruiken we enkel het detailniveau voor de analyse.
-In het andere geval aggregeren we de detailtellingen tot een totaal en gebruiken we deze totalen, samen met de tellingen op totaalniveau, voor de analyse.
-Hebben we meerdere tellingen per winter, dan geven we eerst voorrang aan de tellingen op detailniveau.
-Alternatieve detailtellingen zijn detailtellingen die op minder dan 10 dagen van een bruikbare detailtellingen liggen.
-We kunnen deze tellingen gebruiken indien de bruikbare telling bepaalde deellocaties niet omvat.
-In de praktijk is dit enkel relevant wanneer een telling over meerdere dagen gespreid werd.
+De categorieën beschrijven enerzijds de beschikbare detail van de tellingen en de manier waarop we deze verwerken in de analyse.
+Hiervoor zijn er vier mogelijkheden:
+
+- "detail": tellingen op het niveau van de deellocaties die we op die detailniveau gebruiken voor de analyse;
+- "detail als totaal": tellingen op het niveau van de deellocaties die we aggregeren tot een totaal voor de analyse.
+  We gebruiken deze optie wanneer we minder dan 4 winters met detailtellingen hebben of wanneer het aantal winters met detailtellingen kleiner is dan het aantal winters met totaaltellingen;
+- "totaal": tellingen op het niveau van het volledige winterverblijf die we gebruiken voor de analyse.
+- "ontbreekt in databank": voor deze winter hebben we momenteel geen telling in de databank.
+
+Per winter gebruiken we slechts één telling voor de analyse.
+We kiezen de telling met het meeste detail die het dichtst bij 15 januari ligt.
+Enerzijds omdat we zo veel mogelijk detail willen gebruiken.
+Anderzijds omdat het aantal vleermuizen meestal het hoogst is in het midden van de winter.
+Vandaar dat we nog een bijkomende indeling maken in de tellingen:
+
+- "gebruikt": de telling die we in de analyse gebruiken.
+- "alternatief": een tweede detailtelling die maximum 10 dagen verwijderd is van de bruikbare telling.
+  Deze gebruiken we enkel indien de bruikbare telling bepaalde deellocaties niet omvat.
+  Bijvoorbeeld omdat de vrijwilligers de tellingen over meerdere dagen gespreid hebben.
+- "bijkomend": bijkomende tellingen die we niet gebruiken in de analyse.
+- "niet gebruikt": een totaaltelling die we niet gebruiken omdat we de analyse voor dit winterverblijf op detailniveau doen.
+
 :::
 
 ```{r}
@@ -123,9 +141,43 @@ hist_cap <- paste(
 #| fig.cap: !expr 'bruikbaar_cap'
 #| fig-height: 2
 #| fig-width: 7
-ggplot(visits, aes(x = visit_id, y = 1, fill = detailgraad)) +
+raw_visits |>
+  filter(str_detect(.data$type, "old", negate = TRUE)) |>
+  distinct(.data$winter) |>
+  left_join(visits, by = "winter") |>
+  arrange(.data$winter, .data$date) |>
+  mutate(
+    id = row_number(),
+    date = ifelse(
+      is.na(.data$date),
+      paste(.data$winter - 1, .data$winter, sep = "-"),
+      as.character(.data$date)
+    ),
+    detailgraad = ifelse(
+      is.na(.data$detailgraad), "ontbreekt in databank", .data$detailgraad
+    ) |>
+      factor(
+        levels = c(
+          "gebruikt detail", "detail gebruikt als totaal",
+          "gebruikt totaal", "alternatief detail",
+          "bijkomend detail", "bijkomend totaal", "niet gebruikt totaal",
+          "ontbreekt in databank"
+        )
+      )
+  ) -> all_visits
+ggplot(all_visits, aes(x = id, y = 1, fill = detailgraad)) +
   geom_tile() +
-  scale_x_discrete(labels = visits$date) +
+  scale_x_continuous(breaks = all_visits$id, labels = all_visits$date) +
+  scale_fill_manual(
+    values = c(
+      "gebruikt detail" = inbo_groen, "detail gebruikt als totaal" = inbo_groen,
+      "gebruikt totaal" = inbo_donkerblauw,
+      "alternatief detail" = inbo_donkergroen,
+      "bijkomend detail" = inbo_oranje, "bijkomend totaal" = inbo_geel,
+      "niet gebruikt totaal" = inbo_grijs,
+      "ontbreekt in databank" = inbo_felrood
+    )
+  ) +
   theme(
     axis.title = element_blank(), axis.text.x = element_text(angle = 90),
     axis.text.y = element_blank(), axis.ticks = element_blank(),
@@ -136,7 +188,7 @@ ggplot(visits, aes(x = visit_id, y = 1, fill = detailgraad)) +
 We berekenen een monitoringsscore op basis van de winters met bruikbare tellingen tijdens de afgelopen `r params$n_winter` winters.
 Deze score loopt van 0% tot 100%.
 Een score van 100% betekent dat we van alle afgelopen `r params$n_winter` winters een bruikbare telling hebben.
-Recenter winters krijgen een hoger gewicht in de scoreberekening.
+Recentere winters krijgen een hoger gewicht in de scoreberekening.
 Op die manier stimuleren we dat winterverblijven regelmatig geteld worden.
 Is het winterverblijf opgedeeld in deellocaties, dan krijgen tellingen op totaalniveau slechts de helft van de score die tellingen op detailniveau krijgen.
 Op die manier stimuleren we om de tellingen op detailniveau in te voeren.
@@ -145,7 +197,7 @@ Vanaf een score van `r sprintf("%.2f%%", 100 * sum(1 / seq_len(12)) / sum(1 / se
 Vanaf een score van `r sprintf("%.2f%%", 100 * sum(1 / seq_len(6)) / sum(1 / seq_len(24)))` (equivalent met bruikbare tellingen voor alle afgelopen 6 winters), geven we een bronzen badge.
 In @fig-overzicht-score geven we de monitoringsscore van dit winterverblijf.
 De score bedraagt `r this_score$tekst`.
-Het winterverblijf staat daarmee op plaats `r this_score$rang`.
+Het winterverblijf staat daarmee op plaats `r this_score$rang` van de `r nrow(scores)` winterverblijven met minstens een telling tijdens de laatste `r params$n_winter` winters.
 
 ```{r}
 #| label: fig-overzicht-score
@@ -168,9 +220,7 @@ ggplot(scores, aes(x = score)) +
   ) +
   geom_histogram(binwidth = 0.01) +
   geom_vline(
-    xintercept = this_score$score,
-    linetype = "dashed",
-    color = inbo_hoofd
+    xintercept = this_score$score, linetype = "dashed", colour = inbo_oranje
   ) +
   geom_label(
     data = badges,

@@ -219,6 +219,25 @@ Zie de uitleg in @sec-type-IV."
 
 # Resultaten per soort
 
+```{r}
+#| label: no-observations
+#| eval: !expr 'nrow(raw_count) == 0'
+#| results: "asis"
+c(
+  "Gedurende de laatste %i winters onderzochten de vrijwilligers dit
+  winterverblijf tijdens %i winter%s.",
+  "Ze troffen nooit vleermuizen aan.",
+  "Hoewel we geen resultaten kunnen weergeven, geven we een uitleg over de",
+  "mogelijke figuren indien er wel waarnemingen waren geweest."
+) |>
+  paste(collapse = "\n") |>
+  sprintf(
+    params$n_winter, length(unique(relevant_visit$winter)),
+    ifelse(length(unique(relevant_visit$winter)) > 1, "s", "")
+  ) |>
+  cat(sep = "\n")
+```
+
 ```{r species-data}
 selected_species <- get_child_species(data_root, "Mmysbra")
 selected_species |>
@@ -804,21 +823,21 @@ this_totals <- display_totals(timeseries, this_species, raw_cspec)
 
 ## Beknopte uitleg over de figuren {#sec-uitleg}
 
-We geven enkel resultaten voor de soorten we aantroffen in `r params$name`.
+We geven enkel resultaten voor de soorten die we aantroffen in `r params$name`.
 Per soort tonen we maximaal vier figuren.
-Welke figuren we tonen, hangt af de aanwezigheid van de soort in dit winterverblijf en in Vlaanderen.
+Welke figuren we tonen, hangt af van de aanwezigheid van de soort in dit winterverblijf en in Vlaanderen.
 Is een soort te zeldzaam in Vlaanderen, dan kunnen we geen betrouwbare trendanalyse uitvoeren.
 Hetzelfde geldt voor soorten die we niet tot op naam konden brengen.
 Voor deze soorten tonen we enkel de figuur type Ia (@sec-type-Ia).
 
 Wanneer we voldoende gegevens hebben om een betrouwbare trendanalyse uit te voeren, tonen we twee bijkomende figuren (type II, @sec-type-II en type III, @sec-type-III).
 
-Wanneer de soort binnen deze winterverblijf voldoende aanwezig is om ze te gebruiken bij de analyse op het niveau van Vlaanderen, tonen we een derde figuur (type III, @sec-type-III) en gebruiken we voor de eerste figuur type Ib (@sec-type-Ib) i.p.v. type Ia.
+Wanneer de soort binnen dit winterverblijf voldoende aanwezig is om ze te gebruiken bij de analyse op het niveau van Vlaanderen, tonen we een derde figuur (type III, @sec-type-III) en gebruiken we voor de eerste figuur type Ib (@sec-type-Ib) i.p.v. type Ia.
 
 ### Figuur type Ia {#sec-type-Ia}
 
 Deze figuur toont de waargenomen aantallen van de soort in `r params$name` over de tijd.
-Elk punt heeft het totaal van de soort weer tijdens een bepaalde winter.
+Elk punt geeft het totaal van de soort weer tijdens een bepaalde winter.
 Meerdere tellingen tijdens dezelfde winter staan dan boven elkaar.
 Merk op dat deze tellingen niet gebruikt zijn voor de trendanalyse.
 
@@ -827,7 +846,7 @@ Merk op dat deze tellingen niet gebruikt zijn voor de trendanalyse.
 Deze figuur gebruikt de type Ia figuur als basis.
 De kleur van de punten geeft nu aan of de telling gebruikt is in de trendanalyse of niet.
 Omdat dit winterverblijf gebruikt is in de trendanalyse op Vlaams niveau, kunnen we een inschatting maken van de aantallen bij ontbrekende tellingen.
-Hierbij kan zowel gaan over tellingen die volledig ontbreken als over tellingen die slechts gedeeltelijk uitgevoerd zijn.
+Hierbij kan het zowel gaan over tellingen die volledig ontbreken als over tellingen die slechts gedeeltelijk uitgevoerd zijn.
 Bijgevolg is het totaal nooit kleiner dan het waargenomen aantal van de gebruikte tellingen.
 De totalen geven we weer als een lijn en drie gekleurde banden.
 De lijn geeft het geschatte totaal weer.
@@ -840,7 +859,7 @@ Op het einde van de tijdreeks is er altijd onzekerheid omdat we daar een voorspe
 ### Figuur type II {#sec-type-II}
 
 Deze figuur bevat een lijn en drie gekleurde banden.
-De lijn geeft de geschatte totale populatie over alle winterverblijven weer inclusief een inschatting voor van de niet-getelde (delen van) winterverblijven.
+De lijn geeft de geschatte totale populatie over alle winterverblijven weer inclusief een inschatting voor de niet-getelde (delen van) winterverblijven.
 De gekleurde banden geven de onzekerheid rond de geschatte totalen weer.
 De donkerste band geeft het 30%-geloofwaardigheidsinterval weer, de middelste band het 60%-geloofwaardigheidsinterval en de lichtste band het 90%-geloofwaardigheidsinterval.
 Hoe breder de band, hoe groter de onzekerheid.
@@ -867,6 +886,6 @@ Dit winterverblijf rekenen we tot de groep "`r location_type`".
 
 ### Figuur type IV {#sec-type-IV}
 
-Deze figuur toont de verhouding van de aantallen in deze winterverblijf in verhouding met de totale aantallen in Vlaanderen.
+Deze figuur toont de verhouding van de aantallen in dit winterverblijf in verhouding met de totale aantallen in Vlaanderen.
 De lijn geeft de gemiddelde schatting van de verhouding weer.
 De gekleurde banden geven de onzekerheid rond de geschatte verhouding weer.

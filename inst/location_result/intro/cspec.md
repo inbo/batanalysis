@@ -1,5 +1,6 @@
 ::: {lang=nl-BE}
-## Vleermuis specimen
+## Vleermuis species
 
-Dit betreft waarnemingen van vleermuizen die we niet tot op soortniveau kunnen determineren.
+Dit betreft waarnemingen van vleermuizen die we niet tot op soort- of genusniveau kunnen determineren.
+
 :::

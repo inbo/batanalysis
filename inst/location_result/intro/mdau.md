@@ -1,7 +1,7 @@
 ::: {lang=nl-BE}
 ## Watervleermuis
 
-De watervleermuis (_[Myotis daubentonii]{lang=sc-WO}_) is een vrij algemene vleermuis, die zowat overal in Vlaanderen gevonden kan worden in de buurt van waterpartijen met vrij zuivere insectenrijke waterpartijen met begroeide oevers.
+De watervleermuis (_[Myotis daubentonii]{lang=sc-WO}_) is een vrij algemene vleermuis, die zowat overal in Vlaanderen gevonden kan worden in de buurt van vrij zuivere insectenrijke waterpartijen met begroeide oevers.
 
 Tijdens de zomer verblijven watervleermuizen vrijwel uitsluitend in holle bomen.
 De soort kenmerkt zich vooral door zijn jachttechniek: de vleermuis vliegt vlak boven het wateroppervlak en schept daar rondvliegende insecten weg.

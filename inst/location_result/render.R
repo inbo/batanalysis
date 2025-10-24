@@ -72,12 +72,12 @@ for (i in seq_len(nrow(to_do))) {
   c(
     template,
     paste(
-      "  title: %s",
+      "  title: \"%s\"",
       paste(
         "  subtitle: Overzicht van de overwinterende vleermuizen tijdens de",
         "periode 2002-2025"
       ),
-      "  shorttitle: %s",
+      "  shorttitle: \"%s\"",
       sep = "\n"
     ) |>
       sprintf(to_do$name[i], to_do$filename[i]),

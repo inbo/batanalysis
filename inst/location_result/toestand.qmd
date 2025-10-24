@@ -96,40 +96,64 @@ if (relevant$type == "detail") {
         summarise(observed = sum(.data$total), .groups = "drop")
     ) -> observed
 }
-file.path("hibernation", "total_location") |>
-  verify_vc(
-    root = result_root, variables = c("species", "location_id", "winter")
-  ) |>
-  semi_join(relevant, by = c("location_id", "winter")) |>
-  select("species", "winter", "mean", starts_with("p")) |>
-  left_join(x = observed, by = "species") |>
-  mutate(
-    label = ifelse(
-      is.na(.data$mean),
-      .data$observed,
-      ifelse(
-        .data$p05 == .data$p95,
-        .data$mean,
-        sprintf("%.1f, (%.1f; %.1f)", .data$mean, .data$p05, .data$p95)
-      )
-    ),
-    across(starts_with("p"), ~ ifelse(is.na(.x), .data$observed, .x)),
-    winter = replace_na(.data$winter, relevant$winter)
-  ) |>
-  inner_join(species, by = c("species" = "code")) |>
-  mutate(
-    name = reorder(.data$name, .data$p50),
-    position = ifelse(.data$p95 < 0.5 * max(.data$p95), -0.2, 1.2)
-  ) -> recent
+if (nrow(observed) > 0) {
+  file.path("hibernation", "total_location") |>
+    verify_vc(
+      root = result_root, variables = c("species", "location_id", "winter")
+    ) |>
+    semi_join(relevant, by = c("location_id", "winter")) |>
+    select("species", "winter", "mean", starts_with("p")) |>
+    left_join(x = observed, by = "species") |>
+    mutate(
+      label = ifelse(
+        is.na(.data$mean),
+        .data$observed,
+        ifelse(
+          .data$p05 == .data$p95,
+          .data$mean,
+          sprintf("%.1f, (%.1f; %.1f)", .data$mean, .data$p05, .data$p95)
+        )
+      ),
+      across(starts_with("p"), ~ ifelse(is.na(.x), .data$observed, .x)),
+      winter = replace_na(.data$winter, relevant$winter)
+    ) |>
+    inner_join(species, by = c("species" = "code")) |>
+    mutate(
+      name = reorder(.data$name, .data$p50),
+      position = ifelse(.data$p95 < 0.5 * max(.data$p95), -0.2, 1.2)
+    ) -> recent
+}
 ```
 
 # Overzicht van de huidige toestand
 
-In @fig-recent geven we een overzicht van het totaal aantal per soort voor `r params$name` tijdens de meest recente beschikbare telling.
+```{r}
+#| label: text
+#| results: asis
+text <- "De meest recente bruikbare telling in %s dateert van %s."
+if (nrow(observed) == 0) {
+  c(
+    text,
+    "De vrijwilligers konden geen vleermuizen waarnemen tijdens deze telling."
+  ) |>
+    paste() |>
+    sprintf(params$name, format(relevant$date, "%d-%m-%Y")) |>
+    cat()
+} else {
+  c(
+    text,
+    "In @fig-recent geven we een overzicht van het totaal aantal per soort",
+    "tijdens deze telling."
+  ) |>
+    paste() |>
+    sprintf(params$name, format(relevant$date, "%d-%m-%Y")) |>
+    cat()
+}
+```
 
 ```{r}
 #| label: imputation
-#| eval: !expr 'any(recent$p05 < recent$p95)'
+#| eval: !expr 'nrow(observed) > 0 && any(recent$p05 < recent$p95)'
 #| results: "asis"
 paste(
   "Indien de balk deels transparant is, dan is dat een indicatie dat het",
@@ -141,7 +165,15 @@ paste(
   "We geven in dat geval drie getallen weer:",
   "het geschatte gemiddelde,",
   "en tussen haakjes de 5%- en 95%-kwantielen van de onzekerheidsverdeling.",
-  "Hierdoor zijn kommagetallen mogelijk."
+  "Hierdoor zijn kommagetallen mogelijk.",
+  "Indien we bij een soort slechts een getal weergeven, zijn er twee",
+  "mogelijkheden:",
+  "",
+  "- alle delen van het winterverblijf waar de soort voorkwam werden",
+  "  onderzocht tijdens deze telling.",
+  "- we modelleren geen aantallen voor deze soort en geven dus het",
+  "  waargenomen totaal weer.",
+  sep = "\n"
 ) |>
   cat()
 ```
@@ -153,6 +185,7 @@ toestand_cap <- "De totalen per soort voor %s tijdens de winter van %i."
 
 ```{r}
 #| label: fig-recent
+#| eval: !expr 'nrow(observed) > 0'
 #| fig.cap: !expr 'sprintf(toestand_cap, params$name, relevant$winter)'
 recent |>
   ggplot(aes(x = name)) +
