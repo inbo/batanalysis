@@ -3,7 +3,7 @@
 #' @return A tibble with columns location_id, location_name, sublocation_id,
 #' sublocation, n (number of visits where the sublocation was not surveyed)
 #' @importFrom dplyr anti_join count distinct filter inner_join mutate select
-#' semi_join
+#' @importFrom dplyr semi_join
 #' @importFrom git2rdata verify_vc
 #' @importFrom rlang .data
 #' @export

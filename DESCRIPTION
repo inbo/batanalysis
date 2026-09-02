@@ -12,9 +12,9 @@ Description: The reproducible analysis of the bat monitoring data in
 License: GPL-3
 URL: https://github.com/inbo/batanalysis
 BugReports: https://github.com/inbo/batanalysis/issues
-Depends: 
+Depends:
     R (>= 4.2.0)
-Imports: 
+Imports:
     assertthat,
     curl,
     DBI,
@@ -34,9 +34,9 @@ Imports:
 Suggests:
     Matrix,
     readr
-Config/checklist/communities: inbo
-Config/checklist/keywords: hibernating bats; natura2000; habitat directive
+Config/citeme/communities: inbo
+Config/citeme/keywords: hibernating bats; natura2000; habitat directive; inbo_version
 Encoding: UTF-8
 Language: en-GB
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
+Config/roxygen2/version: 8.1.0

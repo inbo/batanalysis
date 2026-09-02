@@ -5,7 +5,7 @@
 #' @inheritParams n2kanalysis::display
 #' @export
 #' @importFrom n2kanalysis manifest_yaml_to_bash n2k_manifest
-#' store_manifest_yaml
+#' @importFrom n2kanalysis store_manifest_yaml
 #' @importFrom purrr map_dfr
 prepare_analysis_model <- function(
   raw_data,

@@ -23,7 +23,7 @@
 #' within 10 days from each other.
 #' This allows to spread the visits over a few days.
 #' @importFrom dplyr bind_rows filter group_by left_join inner_join mutate n
-#' select semi_join transmute ungroup
+#' @importFrom dplyr select semi_join transmute ungroup
 #' @importFrom git2rdata verify_vc
 #' @importFrom lubridate round_date year
 #' @importFrom rlang .data

@@ -3,7 +3,7 @@
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom dplyr anti_join bind_rows count distinct filter inner_join select
-#' transmute
+#' @importFrom dplyr transmute
 #' @importFrom DBI dbGetQuery
 #' @importFrom rlang .data
 read_raw_section <- function(origin, ignore = c("dead", "flying")) {

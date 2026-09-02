@@ -4,7 +4,7 @@
 #' @export
 #' @importFrom assertthat assert_that noNA
 #' @importFrom dplyr anti_join bind_rows count distinct filter inner_join select
-#' transmute
+#' @importFrom dplyr transmute
 #' @importFrom DBI dbGetQuery
 #' @importFrom rlang .data
 read_raw_total <- function(origin, ignore = c("dead", "flying")) {

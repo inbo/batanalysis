@@ -24,7 +24,7 @@
 #' @return A data frame with the location ID, badge type, and score.
 #' @export
 #' @importFrom dplyr anti_join bind_rows count distinct filter inner_join
-#' left_join mutate select semi_join
+#' @importFrom dplyr left_join mutate select semi_join
 #' @importFrom git2rdata verify_vc
 #' @importFrom lubridate round_date year
 #' @importFrom rlang .data

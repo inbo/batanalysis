@@ -20,7 +20,7 @@
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom dplyr bind_rows filter group_by inner_join mutate rename select
-#' summarise ungroup
+#' @importFrom dplyr summarise ungroup
 #' @importFrom tidyr complete nesting pivot_longer pivot_wider
 #' @importFrom rlang .data sym
 duplicate_visit <- function(origin, ignore = c("dead", "flying")) {

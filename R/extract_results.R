@@ -477,7 +477,7 @@ extract_results.n2kModelImputed <- function(x, root, ...) {
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom dplyr bind_cols case_when group_by inner_join mutate select
-#' starts_with summarise
+#' @importFrom dplyr starts_with summarise
 #' @importFrom git2rdata is_git2rdata update_metadata write_vc
 #' @importFrom n2kanalysis get_file_fingerprint status
 #' @importFrom rlang .data
@@ -935,7 +935,7 @@ extract_results.n2kAggregate <- function(x, root, ...) {
 #' @export
 #' @importFrom assertthat assert_that is.count noNA
 #' @importFrom dplyr arrange bind_cols distinct group_by inner_join mutate
-#' row_number select starts_with summarise
+#' @importFrom dplyr row_number select starts_with summarise
 #' @importFrom git2rdata is_git2rdata update_metadata write_vc
 #' @importFrom INLA inla.mesh.projector inla.posterior.sample inla.zmarginal
 #' @importFrom inlatools prec2sd
@@ -1802,7 +1802,7 @@ extract_results.n2kSpde <- function(x, root, ..., n_sim = 100) {
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom dplyr bind_cols case_when group_by inner_join mutate select
-#' starts_with summarise
+#' @importFrom dplyr starts_with summarise
 #' @importFrom git2rdata is_git2rdata write_vc
 #' @importFrom n2kanalysis get_file_fingerprint status
 #' @importFrom stats quantile sd

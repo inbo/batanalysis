@@ -8,7 +8,7 @@
 #' @importFrom assertthat assert_that
 #' @importFrom DBI dbGetQuery
 #' @importFrom dplyr anti_join bind_rows count distinct filter inner_join
-#' semi_join transmute
+#' @importFrom dplyr semi_join transmute
 #' @importFrom git2rdata commit write_vc
 #' @importFrom rlang .data
 import_raw_data <- function(
