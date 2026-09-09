@@ -24,19 +24,3 @@ write.csv2(dups$sublocation, "problem_sublocation.csv", row.names = FALSE)
 write.csv2(dups$location, "problem_location.csv", row.names = FALSE)
 write.csv2(dups$clean, "problem_clean.csv", row.names = FALSE)
 DBI::dbDisconnect(origin)
-
-analysis_data <- "../batanalysis_analysis"
-if (file_test("-d", analysis_data)) {
-  analysis_data <- git2rdata::repository(analysis_data)
-} else {
-  dir.create(target)
-  analysis_data <- git2r::init(analysis_data)
-}
-prepare_analysis_data(
-  raw_data = target,
-  analysis_data = analysis_data,
-  start = as.integer(format(Sys.Date(), "%Y")) - 23,
-  n_winter = 4,
-  n_present = 3,
-  strict = FALSE
-)
