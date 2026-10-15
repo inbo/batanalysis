@@ -124,6 +124,7 @@ importFrom(sf,
   st_transform,
   st_union
 )
+importFrom(splines,ns)
 importFrom(stats,
   aggregate,
   poly,

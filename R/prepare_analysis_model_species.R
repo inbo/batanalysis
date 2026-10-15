@@ -16,6 +16,7 @@
 #' @importFrom n2kanalysis n2k_model_imputed n2k_spde spde store_model
 #' @importFrom rlang .data sym
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
+#' @importFrom splines ns
 #' @importFrom stats poly
 #' @importFrom tidyr complete nesting replace_na
 prepare_analysis_model_species <- function(
@@ -248,20 +249,7 @@ prepare_analysis_model_species <- function(
     select(c("X", "Y")) |>
     spde(range = c(max_dist, 0.9), sigma = c(1, 0.01)) -> spde
 
-  # calculate polynomial coefficients for winter
   dataset |>
-    distinct(.data$winter) |>
-    mutate(
-      winter_r = .data$winter - min(.data$winter) + 1,
-      winter_l = poly(.data$winter, 3)[, 1] |>
-        zapsmall(),
-      winter_q = poly(.data$winter, 3)[, 2] |>
-        zapsmall(),
-      winter_c = poly(.data$winter, 3)[, 3] |>
-        zapsmall()
-    ) -> poly_winter
-  dataset |>
-    inner_join(poly_winter, by = "winter") |>
     transmute(
       .data$observation_id,
       .data$datafield_id,
@@ -280,13 +268,22 @@ prepare_analysis_model_species <- function(
       sublocation_i = factor(.data$sublocation_id),
       # centre winter to the starting year
       .data$winter,
-      winter_i = .data$winter - min(.data$winter) + 1,
-      .data$winter_l,
-      .data$winter_q,
-      .data$winter_c
+      winter_i = .data$winter - min(.data$winter) + 1
     ) -> dataset
   display(verbose = verbose, "    presence")
+  # calculate polynomial coefficients for winter
   dataset |>
+    distinct(.data$winter) |>
+    mutate(
+      winter_l = poly(.data$winter, 3)[, 1] |>
+        zapsmall(),
+      winter_q = poly(.data$winter, 3)[, 2] |>
+        zapsmall(),
+      winter_c = poly(.data$winter, 3)[, 3] |>
+        zapsmall()
+    ) -> poly_winter
+  dataset |>
+    inner_join(poly_winter, by = "winter") |>
     group_by(.data$sublocation_id) |>
     mutate(
       present = as.integer(.data$number > 0),
@@ -414,117 +411,67 @@ prepare_analysis_model_species <- function(
   store_model(presence, base = base, project = project, overwrite = overwrite)
 
   display(verbose = verbose, "    number when present")
+  df <- 4
+  ns(dataset$winter, df = df) |>
+    as.data.frame() |>
+    `colnames<-`(sprintf("loc_s_%i", seq_len(df))) -> splines
   dataset |>
-    group_by(.data$sublocation_id) |>
-    mutate(
-      n_subloc = ifelse(
-        is.na(.data$sublocation_id),
-        0,
-        sum(.data$number > 0, na.rm = TRUE)
-      ),
-      number = ifelse(.data$number > 0, .data$number, NA_integer_),
-      sublocation_l = ifelse(.data$n_subloc >= 6, .data$sublocation_id, NA) |>
-        factor(levels = levels(.data$sublocation_i)),
-      subwinter_l = ifelse(.data$n_subloc >= 6, .data$winter_l, 0),
-      sublocation_q = ifelse(.data$n_subloc >= 12, .data$sublocation_id, NA) |>
-        factor(levels = levels(.data$sublocation_i)),
-      subwinter_q = ifelse(.data$n_subloc >= 12, .data$winter_l, 0),
-      sublocation_c = ifelse(.data$n_subloc >= 18, .data$sublocation_id, NA) |>
-        factor(levels = levels(.data$sublocation_i)),
-      subwinter_c = ifelse(.data$n_subloc >= 18, .data$winter_c, 0)
+    bind_cols(
+      splines,
+      splines |>
+        `colnames<-`(sprintf("subloc_s_%i", seq_len(df)))
     ) |>
-    ungroup() -> ds_number
-  ds_number |>
-    filter(.data$number > 0) |>
-    distinct(.data$location_id, .data$winter) |>
-    count(.data$location_id, name = "n_loc") |>
-    inner_join(ds_number, by = "location_id") |>
     mutate(
-      location_l = ifelse(.data$n_loc >= 6, .data$location_id, NA) |>
-        factor(levels = levels(.data$location_i)),
-      winter_l = ifelse(.data$n_loc >= 6, .data$winter_l, 0),
-      location_q = ifelse(.data$n_loc >= 12, .data$location_id, NA) |>
-        factor(levels = levels(.data$location_i)),
-      winter_q = ifelse(.data$n_loc >= 12, .data$winter_q, 0),
-      location_c = ifelse(.data$n_loc >= 18, .data$location_id, NA) |>
-        factor(levels = levels(.data$location_i)),
-      winter_c = ifelse(.data$n_loc >= 18, .data$winter_c, 0)
-    ) |>
-    select(-"n_loc", -"n_subloc") -> ds_number
+      number = ifelse(.data$number > 0, .data$number, NA_real_),
+      loc_1 = as.integer(location_id),
+      loc_2 = as.integer(location_id),
+      loc_3 = as.integer(location_id),
+      loc_4 = as.integer(location_id),
+      subloc_1 = as.integer(sublocation_id),
+      subloc_2 = as.integer(sublocation_id),
+      subloc_3 = as.integer(sublocation_id),
+      subloc_4 = as.integer(sublocation_id)
+    ) -> ds_number
   count <- n2k_spde(
-    formula = paste(
+    formula = c(
       "number ~ 0",
-      paste(
-        c(
-          "fortress"[any(ds_number$fortress > 0)],
-          "marl_quarry"[any(ds_number$marl_quarry > 0)],
-          "other_large"[any(ds_number$other_large > 0)],
-          "small"[any(ds_number$small > 0)]
-        ),
-        collapse = " +\n"
-      ),
-
+      "fortress"[any(ds_number$fortress > 0)],
+      "marl_quarry"[any(ds_number$marl_quarry > 0)],
+      "other_large"[any(ds_number$other_large > 0)],
+      "small"[any(ds_number$small > 0)],
       "f(
         winter_i,
         model = \"rw1\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(0.15, 0.05)))
       )",
       "f(
-        sublocation_i,
-        model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
-      )",
-      paste(
-        c(
-          "f(
         location_i,
         model = \"iid\",
         hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.05)))
-      ) +
-      f(
-        location_l,
-        winter_l,
+      )",
+      "f(
+        sublocation_i,
         model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-      ) +
-      f(
-        location_q,
-        winter_q,
-        model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-      )"[length(unique(ds_number$location_id)) > 1],
-          "f(
-        location_c,
-        winter_c,
-        model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(1, 0.01)))
-      )"[
-            length(unique(ds_number$location_id)) > 1 &&
-              any(!is.na(ds_number$location_c))
-          ],
-          "f(
-        sublocation_l,
-        subwinter_l,
-        model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )"[any(!is.na(ds_number$sublocation_l))],
-          "f(
-        sublocation_q,
-        subwinter_q,
-        model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )"[any(!is.na(ds_number$sublocation_q))],
-          "f(
-        sublocation_c,
-        subwinter_c,
-        model = \"iid\",
-        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.01)))
-      )"[any(!is.na(ds_number$sublocation_c))]
-        ),
-        collapse = " +\n"
-      ),
-      sep = " +\n"
-    ),
+        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.5, 0.05)))
+      )",
+      c(
+        "f(",
+        "  loc_%1$i,",
+        "  loc_s_%1$i,",
+        "  model = \"iid\",",
+        "  hyper = list(theta = list(prior = \"pc.prec\", param = c(0.1, 0.001)))",
+        ") +",
+        "f(",
+        "subloc_%1$i,",
+        "subloc_s_%1$i,",
+        "model = \"iid\",",
+        "hyper = list(theta = list(prior = \"pc.prec\", param = c(0.05, 0.001)))",
+        ")"
+      ) |>
+        paste(collapse = "\n") |>
+        sprintf(seq_len(df))
+    ) |>
+      paste(collapse = " +\n"),
     model_type = paste(
       "inla zeroinflatednbinomial0:",
       "SPDE + Winter * (1 + Location + SubLocation)"
