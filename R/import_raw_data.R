@@ -254,7 +254,7 @@ Only given when no observations at the sublocation level are available.",
       )
     )
   commit(
-    message = "Automated commit from abvanalysis",
+    message = "Automated commit from batanalysis",
     repo = target,
     session = TRUE,
     all = TRUE
