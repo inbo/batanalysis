@@ -120,9 +120,12 @@ importFrom(sf,
   st_convex_hull,
   st_coordinates,
   st_drop_geometry,
+  st_join,
+  st_read,
   st_sample,
   st_transform,
-  st_union
+  st_union,
+  st_within
 )
 importFrom(splines,ns)
 importFrom(stats,
