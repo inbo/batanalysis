@@ -53,13 +53,13 @@ prepare_analysis_model_species <- function(
       file.path("data", "hibernation", "locations") |>
         verify_vc(
           root = raw_data,
-          variables = c("id", "longitude", "latitude", "parent_id")
+          variables = c("id", "longitude", "latitude", "parent_id", "province")
         ),
       by = c("location_id" = "id")
     ) |>
     left_join(
       file.path("data", "hibernation", "location_types") |>
-        verify_vc(root = raw_data, c("location_id", "type")),
+        verify_vc(root = raw_data, variables = c("location_id", "type")),
       by = "location_id"
     ) |>
     transmute(
@@ -67,6 +67,7 @@ prepare_analysis_model_species <- function(
       .data$longitude,
       .data$latitude,
       .data$detailed,
+      .data$province,
       type = replace_na(.data$type, "small")
     ) |>
     st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
@@ -259,6 +260,8 @@ prepare_analysis_model_species <- function(
       .data$location_id,
       # define the type of location
       .data$type,
+      .data$province,
+      .data$winter,
       fortress = as.integer(.data$type == "fortress"),
       marl_quarry = as.integer(.data$type == "marl quarry"),
       other_large = as.integer(.data$type == "other large"),
@@ -267,7 +270,6 @@ prepare_analysis_model_species <- function(
       location_i = factor(.data$location_id),
       sublocation_i = factor(.data$sublocation_id),
       # centre winter to the starting year
-      .data$winter,
       winter_i = .data$winter - min(.data$winter) + 1
     ) -> dataset
   display(verbose = verbose, "    presence")
@@ -319,7 +321,8 @@ prepare_analysis_model_species <- function(
         factor(levels = levels(.data$location_i)),
       winter_c = ifelse(.data$n_loc >= 9, .data$winter_c, NA_real_)
     ) |>
-    select(-"n_loc", -"n_subloc", -"number", -"type") -> ds_present
+    select(-"n_loc", -"n_subloc", -"number", -"type", -"province") |>
+    arrange(.data$observation_id) -> ds_present
   presence <- n2k_spde(
     formula = paste(
       "present ~ 0",
@@ -431,7 +434,8 @@ prepare_analysis_model_species <- function(
       subloc_2 = as.integer(sublocation_id),
       subloc_3 = as.integer(sublocation_id),
       subloc_4 = as.integer(sublocation_id)
-    ) -> ds_number
+    ) |>
+    arrange(.data$observation_id) -> ds_number
   count <- n2k_spde(
     formula = c(
       "number ~ 0",
@@ -497,6 +501,11 @@ prepare_analysis_model_species <- function(
     )
   )
   store_model(count, base = base, project = project, overwrite = overwrite)
+  stopifnot(
+    "different ordering" = isTRUE(
+      all.equal(ds_present$observation_id, ds_number$observation_id)
+    )
+  )
 
   # combine the models into a hurdle model
   display(verbose = verbose, "    dependent models")
@@ -511,7 +520,9 @@ prepare_analysis_model_species <- function(
     location_group_id = hurdle@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter + type + location",
     formula = paste(
-      "~winter + fortress + marl_quarry + other_large + small + location_id"
+      "~winter + fortress + marl_quarry + other_large + small + province",
+      "location_id",
+      sep = "+"
     ),
     fun = sum,
     status = "waiting",
@@ -529,30 +540,89 @@ prepare_analysis_model_species <- function(
     overwrite = overwrite
   )
 
+  # create the aggregate by winter, province and type
+  aggregated_province_type <- n2k_aggregate(
+    result_datasource_id = aggregated_location@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_location@AnalysisMetadata$scheme_id,
+    species_group_id = aggregated_location@AnalysisMetadata$species_group_id,
+    location_group_id = aggregated_location@AnalysisMetadata$location_group_id,
+    model_type = "aggregate imputed: sum ~ winter + province + type",
+    formula = paste(
+      "~winter + fortress + marl_quarry + other_large + small + province"
+    ),
+    fun = sum,
+    status = "waiting",
+    parent = aggregated_location@AnalysisMetadata$file_fingerprint,
+    first_imported_year = aggregated_location@AnalysisMetadata$first_imported_year,
+    last_imported_year = aggregated_location@AnalysisMetadata$last_imported_year,
+    duration = aggregated_location@AnalysisMetadata$duration,
+    last_analysed_year = aggregated_location@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_location@AnalysisMetadata$analysis_date
+  )
+  store_model(
+    aggregated_province_type,
+    base = base,
+    project = project,
+    overwrite = overwrite
+  )
+
   # aggregate by type
   # fmt: skip
   aggregated_type <- n2k_aggregate(
     result_datasource_id =
-      aggregated_location@AnalysisMetadata$result_datasource_id,
-    scheme_id = aggregated_location@AnalysisMetadata$scheme_id,
-    species_group_id = aggregated_location@AnalysisMetadata$species_group_id,
-    location_group_id = aggregated_location@AnalysisMetadata$location_group_id,
+      aggregated_province_type@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_province_type@AnalysisMetadata$scheme_id,
+    species_group_id =
+      aggregated_province_type@AnalysisMetadata$species_group_id,
+    location_group_id =
+      aggregated_province_type@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter + type",
     formula = "~winter + fortress + marl_quarry + other_large + small",
     fun = sum,
     status = "waiting",
-    parent = aggregated_location@AnalysisMetadata$file_fingerprint,
+    parent = aggregated_province_type@AnalysisMetadata$file_fingerprint,
     first_imported_year =
-      aggregated_location@AnalysisMetadata$first_imported_year,
+      aggregated_province_type@AnalysisMetadata$first_imported_year,
     last_imported_year =
-      aggregated_location@AnalysisMetadata$last_imported_year,
-    duration = aggregated_location@AnalysisMetadata$duration,
+      aggregated_province_type@AnalysisMetadata$last_imported_year,
+    duration = aggregated_province_type@AnalysisMetadata$duration,
     last_analysed_year =
-      aggregated_location@AnalysisMetadata$last_analysed_year,
-    analysis_date = aggregated_location@AnalysisMetadata$analysis_date
+      aggregated_province_type@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_province_type@AnalysisMetadata$analysis_date
   )
   store_model(
     aggregated_type,
+    base = base,
+    project = project,
+    overwrite = overwrite
+  )
+
+  # aggregate by province
+  # fmt: skip
+  aggregated_province <- n2k_aggregate(
+    result_datasource_id =
+      aggregated_province_type@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_province_type@AnalysisMetadata$scheme_id,
+    species_group_id =
+      aggregated_province_type@AnalysisMetadata$species_group_id,
+    location_group_id =
+      aggregated_province_type@AnalysisMetadata$location_group_id,
+    model_type = "aggregate imputed: sum ~ winter + province",
+    formula = "~winter + province",
+    fun = sum,
+    status = "waiting",
+    parent = aggregated_province_type@AnalysisMetadata$file_fingerprint,
+    first_imported_year =
+      aggregated_province_type@AnalysisMetadata$first_imported_year,
+    last_imported_year =
+      aggregated_province_type@AnalysisMetadata$last_imported_year,
+    duration = aggregated_province_type@AnalysisMetadata$duration,
+    last_analysed_year =
+      aggregated_province_type@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_province_type@AnalysisMetadata$analysis_date
+  )
+  store_model(
+    aggregated_province,
     base = base,
     project = project,
     overwrite = overwrite
@@ -717,10 +787,12 @@ prepare_analysis_model_species <- function(
       )
     ),
     hurdle@AnalysisRelation,
-    aggregated_tot@AnalysisRelation,
-    total_index@AnalysisRelation,
+    aggregated_location@AnalysisRelation,
+    aggregated_province_type@AnalysisRelation,
+    aggregated_province@AnalysisRelation,
     aggregated_type@AnalysisRelation,
-    aggregated_location@AnalysisRelation
+    aggregated_tot@AnalysisRelation,
+    total_index@AnalysisRelation
   ) |>
     select(fingerprint = "analysis", parent = "parent_analysis")
 }
