@@ -85,7 +85,8 @@ prepare_analysis_model_species <- function(
     ) |>
     semi_join(this_species, by = c("species_id" = "id")) |>
     group_by(.data$visit_id) |>
-    summarise(number = sum(.data$total), .groups = "drop") |>
+    summarise(number = sum(.data$total), .groups = "drop") -> raw_totals
+  raw_totals |>
     left_join(
       x = visits |>
         filter(
@@ -226,6 +227,25 @@ prepare_analysis_model_species <- function(
         filter(!is.na(.data$number))
     ) |>
     inner_join(locations, by = "location_id") -> dataset
+
+  # totals in detailed timeseries to be used as a minimum for the imputed totals
+  visits |>
+    filter(.data$level == "detail") |>
+    semi_join(x = visits, by = "location_id") |>
+    filter(.data$type == "total") |>
+    inner_join(raw_totals, by = "visit_id") |>
+    transmute(
+      observation_id = .data$visit_id,
+      datafield_id = 2L,
+      .data$location_id,
+      .data$winter,
+      .data$number
+    ) |>
+    inner_join(
+      locations |>
+        select("location_id", "province", "type"),
+      by = "location_id"
+    ) -> minimum_totals
 
   display(verbose = verbose, "  preparing analysis objects")
   # calculate analysis date
@@ -518,13 +538,13 @@ prepare_analysis_model_species <- function(
     scheme_id = hurdle@AnalysisMetadata$scheme_id,
     species_group_id = hurdle@AnalysisMetadata$species_group_id,
     location_group_id = hurdle@AnalysisMetadata$location_group_id,
-    model_type = "aggregate imputed: sum ~ winter + type + location",
+    model_type = "aggregate imputed: sum ~ winter + location",
     formula = paste(
-      "~winter + fortress + marl_quarry + other_large + small + province",
-      "location_id",
+      "~winter + province + type + location_id",
       sep = "+"
     ),
     fun = sum,
+    minimum = minimum_totals,
     status = "waiting",
     parent = hurdle@AnalysisMetadata$file_fingerprint,
     first_imported_year = hurdle@AnalysisMetadata$first_imported_year,
@@ -548,7 +568,7 @@ prepare_analysis_model_species <- function(
     location_group_id = aggregated_location@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter + province + type",
     formula = paste(
-      "~winter + fortress + marl_quarry + other_large + small + province"
+      "~winter + province + type"
     ),
     fun = sum,
     status = "waiting",
@@ -577,7 +597,7 @@ prepare_analysis_model_species <- function(
     location_group_id =
       aggregated_province_type@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter + type",
-    formula = "~winter + fortress + marl_quarry + other_large + small",
+    formula = "~winter + type",
     fun = sum,
     status = "waiting",
     parent = aggregated_province_type@AnalysisMetadata$file_fingerprint,
