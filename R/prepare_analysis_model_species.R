@@ -235,8 +235,6 @@ prepare_analysis_model_species <- function(
     filter(.data$type == "total") |>
     inner_join(raw_totals, by = "visit_id") |>
     transmute(
-      observation_id = .data$visit_id,
-      datafield_id = 2L,
       .data$location_id,
       .data$winter,
       .data$number
@@ -529,7 +527,11 @@ prepare_analysis_model_species <- function(
 
   # combine the models into a hurdle model
   display(verbose = verbose, "    dependent models")
-  hurdle <- n2k_hurdle_imputed(presence = presence, count = count)
+  hurdle <- n2k_hurdle_imputed(
+    presence = presence,
+    count = count,
+    by = "observation_id"
+  )
   store_model(hurdle, base = base, project = project, overwrite = overwrite)
 
   # create the aggregate by winter and location
