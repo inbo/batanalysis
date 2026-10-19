@@ -432,7 +432,7 @@ prepare_analysis_model_species <- function(
   store_model(presence, base = base, project = project, overwrite = overwrite)
 
   display(verbose = verbose, "    number when present")
-  df <- 4
+  df <- 3
   ns(dataset$winter, df = df) |>
     as.data.frame() |>
     `colnames<-`(sprintf("loc_s_%i", seq_len(df))) -> splines
@@ -444,14 +444,12 @@ prepare_analysis_model_species <- function(
     ) |>
     mutate(
       number = ifelse(.data$number > 0, .data$number, NA_real_),
-      loc_1 = as.integer(location_id),
-      loc_2 = as.integer(location_id),
-      loc_3 = as.integer(location_id),
-      loc_4 = as.integer(location_id),
-      subloc_1 = as.integer(sublocation_id),
-      subloc_2 = as.integer(sublocation_id),
-      subloc_3 = as.integer(sublocation_id),
-      subloc_4 = as.integer(sublocation_id)
+      loc_1 = as.integer(location_i),
+      loc_2 = as.integer(location_i),
+      loc_3 = as.integer(location_i),
+      subloc_1 = as.integer(sublocation_i),
+      subloc_2 = as.integer(sublocation_i),
+      subloc_3 = as.integer(sublocation_i)
     ) |>
     arrange(.data$observation_id) -> ds_number
   count <- n2k_spde(
