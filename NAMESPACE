@@ -14,6 +14,7 @@ export(import_raw_data)
 export(osm_tile)
 export(prepare_analysis_model)
 export(prepare_analysis_model_species)
+export(prepare_analysis_no_model_species)
 export(read_cluster)
 export(read_raw_individual)
 export(read_raw_location)
@@ -85,6 +86,7 @@ importFrom(lubridate,
   year
 )
 importFrom(n2kanalysis,
+  "status<-",
   display,
   get_file_fingerprint,
   manifest_yaml_to_bash,

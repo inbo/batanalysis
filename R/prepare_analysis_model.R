@@ -45,7 +45,29 @@ prepare_analysis_model <- function(
         ),
         verbose = verbose
       )
-    ) |>
+    ) -> model
+  c(
+    "Mspec",
+    "Cspec",
+    "Eser",
+    "Rfer"
+  ) |>
+    map_dfr(
+      ~ prepare_analysis_no_model_species(
+        species = .x,
+        base = base,
+        project = project,
+        overwrite = overwrite,
+        raw_data = raw_data,
+        visits = visit_type(
+          raw_data = raw_data,
+          start_winter = start_winter,
+          max_delta = max_delta
+        ),
+        verbose = verbose
+      )
+    ) -> no_model
+  bind_rows(model, no_model) |>
     n2k_manifest() |>
     store_manifest_yaml(
       base = base,
