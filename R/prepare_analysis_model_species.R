@@ -76,6 +76,12 @@ prepare_analysis_model_species <- function(
     st_coordinates() |>
     bind_cols(st_drop_geometry(locations)) |>
     mutate(across(c("X", "Y"), ~ . / 1000)) -> locations
+  locations |>
+    distinct(.data$province) |>
+    filter(
+      str_detect(.data$province, "Brussel", negate = TRUE),
+      str_detect(.data$province, "Waals", negate = TRUE)
+    ) -> vlaanderen
 
   display(verbose = verbose, "  preparing data")
   file.path("data", "hibernation", "totals") |>
@@ -599,6 +605,7 @@ prepare_analysis_model_species <- function(
     model_type = "aggregate imputed: sum ~ winter + type",
     formula = "~winter + type",
     fun = sum,
+    join = vlaanderen,
     status = "waiting",
     parent = aggregated_province_type@AnalysisMetadata$file_fingerprint,
     first_imported_year =
