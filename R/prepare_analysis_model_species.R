@@ -566,56 +566,30 @@ prepare_analysis_model_species <- function(
     overwrite = overwrite
   )
 
-  # create the aggregate by winter, province and type
-  aggregated_province_type <- n2k_aggregate(
-    result_datasource_id = aggregated_location@AnalysisMetadata$result_datasource_id,
-    scheme_id = aggregated_location@AnalysisMetadata$scheme_id,
-    species_group_id = aggregated_location@AnalysisMetadata$species_group_id,
-    location_group_id = aggregated_location@AnalysisMetadata$location_group_id,
-    model_type = "aggregate imputed: sum ~ winter + province + type",
-    formula = paste(
-      "~winter + province + type"
-    ),
-    fun = sum,
-    status = "waiting",
-    parent = aggregated_location@AnalysisMetadata$file_fingerprint,
-    first_imported_year = aggregated_location@AnalysisMetadata$first_imported_year,
-    last_imported_year = aggregated_location@AnalysisMetadata$last_imported_year,
-    duration = aggregated_location@AnalysisMetadata$duration,
-    last_analysed_year = aggregated_location@AnalysisMetadata$last_analysed_year,
-    analysis_date = aggregated_location@AnalysisMetadata$analysis_date
-  )
-  store_model(
-    aggregated_province_type,
-    base = base,
-    project = project,
-    overwrite = overwrite
-  )
-
   # aggregate by type
   # fmt: skip
   aggregated_type <- n2k_aggregate(
     result_datasource_id =
-      aggregated_province_type@AnalysisMetadata$result_datasource_id,
-    scheme_id = aggregated_province_type@AnalysisMetadata$scheme_id,
+      aggregated_location@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_location@AnalysisMetadata$scheme_id,
     species_group_id =
-      aggregated_province_type@AnalysisMetadata$species_group_id,
+      aggregated_location@AnalysisMetadata$species_group_id,
     location_group_id =
-      aggregated_province_type@AnalysisMetadata$location_group_id,
+      aggregated_location@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter + type",
     formula = "~winter + type",
     fun = sum,
     join = vlaanderen,
     status = "waiting",
-    parent = aggregated_province_type@AnalysisMetadata$file_fingerprint,
+    parent = aggregated_location@AnalysisMetadata$file_fingerprint,
     first_imported_year =
-      aggregated_province_type@AnalysisMetadata$first_imported_year,
+      aggregated_location@AnalysisMetadata$first_imported_year,
     last_imported_year =
-      aggregated_province_type@AnalysisMetadata$last_imported_year,
-    duration = aggregated_province_type@AnalysisMetadata$duration,
+      aggregated_location@AnalysisMetadata$last_imported_year,
+    duration = aggregated_location@AnalysisMetadata$duration,
     last_analysed_year =
-      aggregated_province_type@AnalysisMetadata$last_analysed_year,
-    analysis_date = aggregated_province_type@AnalysisMetadata$analysis_date
+      aggregated_location@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_location@AnalysisMetadata$analysis_date
   )
   store_model(
     aggregated_type,
@@ -628,25 +602,26 @@ prepare_analysis_model_species <- function(
   # fmt: skip
   aggregated_province <- n2k_aggregate(
     result_datasource_id =
-      aggregated_province_type@AnalysisMetadata$result_datasource_id,
-    scheme_id = aggregated_province_type@AnalysisMetadata$scheme_id,
+      aggregated_location@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_location@AnalysisMetadata$scheme_id,
     species_group_id =
-      aggregated_province_type@AnalysisMetadata$species_group_id,
+      aggregated_location@AnalysisMetadata$species_group_id,
     location_group_id =
-      aggregated_province_type@AnalysisMetadata$location_group_id,
+      aggregated_location@AnalysisMetadata$location_group_id,
     model_type = "aggregate imputed: sum ~ winter + province",
     formula = "~winter + province",
     fun = sum,
+    join = vlaanderen,
     status = "waiting",
-    parent = aggregated_province_type@AnalysisMetadata$file_fingerprint,
+    parent = aggregated_location@AnalysisMetadata$file_fingerprint,
     first_imported_year =
-      aggregated_province_type@AnalysisMetadata$first_imported_year,
+      aggregated_location@AnalysisMetadata$first_imported_year,
     last_imported_year =
-      aggregated_province_type@AnalysisMetadata$last_imported_year,
-    duration = aggregated_province_type@AnalysisMetadata$duration,
+      aggregated_location@AnalysisMetadata$last_imported_year,
+    duration = aggregated_location@AnalysisMetadata$duration,
     last_analysed_year =
-      aggregated_province_type@AnalysisMetadata$last_analysed_year,
-    analysis_date = aggregated_province_type@AnalysisMetadata$analysis_date
+      aggregated_location@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_location@AnalysisMetadata$analysis_date
   )
   store_model(
     aggregated_province,
@@ -818,8 +793,6 @@ prepare_analysis_model_species <- function(
       mutate(type = "hurdle"),
     aggregated_location@AnalysisRelation |>
       mutate(type = "location"),
-    aggregated_province_type@AnalysisRelation |>
-      mutate(type = "province_type"),
     aggregated_province@AnalysisRelation |>
       mutate(type = "province"),
     aggregated_type@AnalysisRelation |>
