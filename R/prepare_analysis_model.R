@@ -67,7 +67,13 @@ prepare_analysis_model <- function(
         verbose = verbose
       )
     ) -> no_model
-  bind_rows(model, no_model) |>
+  no_model |>
+    mutate(
+      parent = ifelse(.data$parent == "", NA_character_, .data$parent)
+    ) |>
+    bind_rows(model) -> all_model
+  all_model |>
+    select("fingerprint", "parent") |>
     n2k_manifest() |>
     store_manifest_yaml(
       base = base,

@@ -811,15 +811,23 @@ prepare_analysis_model_species <- function(
       analysis = c(
         get_file_fingerprint(presence),
         get_file_fingerprint(count)
-      )
+      ),
+      type = c("presence", "count")
     ),
-    hurdle@AnalysisRelation,
-    aggregated_location@AnalysisRelation,
-    aggregated_province_type@AnalysisRelation,
-    aggregated_province@AnalysisRelation,
-    aggregated_type@AnalysisRelation,
-    aggregated_tot@AnalysisRelation,
-    total_index@AnalysisRelation
+    hurdle@AnalysisRelation |>
+      mutate(type = "hurdle"),
+    aggregated_location@AnalysisRelation |>
+      mutate(type = "location"),
+    aggregated_province_type@AnalysisRelation |>
+      mutate(type = "province_type"),
+    aggregated_province@AnalysisRelation |>
+      mutate(type = "province"),
+    aggregated_type@AnalysisRelation |>
+      mutate(type = "type"),
+    aggregated_tot@AnalysisRelation |>
+      mutate(type = "tot"),
+    total_index@AnalysisRelation |>
+      mutate(type = "total_index")
   ) |>
-    select(fingerprint = "analysis", parent = "parent_analysis")
+    select(fingerprint = "analysis", parent = "parent_analysis", "type")
 }
