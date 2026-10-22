@@ -787,20 +787,47 @@ prepare_analysis_model_species <- function(
         get_file_fingerprint(presence),
         get_file_fingerprint(count)
       ),
+      status = c(
+        presence@AnalysisMetadata$status_fingerprint,
+        count@AnalysisMetadata$status_fingerprint
+      ),
       type = c("presence", "count")
     ),
     hurdle@AnalysisRelation |>
-      mutate(type = "hurdle"),
+      mutate(
+        type = "hurdle",
+        status = hurdle@AnalysisMetadata$status_fingerprint
+      ),
     aggregated_location@AnalysisRelation |>
-      mutate(type = "location"),
+      mutate(
+        type = "location",
+        status = aggregated_location@AnalysisMetadata$status_fingerprint
+      ),
     aggregated_province@AnalysisRelation |>
-      mutate(type = "province"),
+      mutate(
+        type = "province",
+        status = aggregated_province@AnalysisMetadata$status_fingerprint
+      ),
     aggregated_type@AnalysisRelation |>
-      mutate(type = "type"),
+      mutate(
+        type = "type",
+        status = aggregated_type@AnalysisMetadata$status_fingerprint
+      ),
     aggregated_tot@AnalysisRelation |>
-      mutate(type = "tot"),
+      mutate(
+        type = "tot",
+        status = aggregated_tot@AnalysisMetadata$status_fingerprint
+      ),
     total_index@AnalysisRelation |>
-      mutate(type = "total_index")
+      mutate(
+        type = "total_index",
+        status = total_index@AnalysisMetadata$status_fingerprint
+      )
   ) |>
-    select(fingerprint = "analysis", parent = "parent_analysis", "type")
+    select(
+      "type",
+      fingerprint = "analysis",
+      "status",
+      parent = "parent_analysis"
+    )
 }

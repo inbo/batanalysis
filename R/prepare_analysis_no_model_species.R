@@ -308,13 +308,30 @@ prepare_analysis_no_model_species <- function(
 
   bind_rows(
     aggregated_location@AnalysisRelation |>
-      mutate(type = "location"),
+      mutate(
+        type = "location",
+        status = aggregated_location@AnalysisMetadata$status_fingerprint
+      ),
     aggregated_province@AnalysisRelation |>
-      mutate(type = "province"),
+      mutate(
+        type = "province",
+        status = aggregated_province@AnalysisMetadata$status_fingerprint
+      ),
     aggregated_type@AnalysisRelation |>
-      mutate(type = "type"),
+      mutate(
+        type = "type",
+        status = aggregated_type@AnalysisMetadata$status_fingerprint
+      ),
     aggregated_tot@AnalysisRelation |>
-      mutate(type = "tot")
+      mutate(
+        type = "tot",
+        status = aggregated_tot@AnalysisMetadata$status_fingerprint
+      )
   ) |>
-    select(fingerprint = "analysis", parent = "parent_analysis", "type")
+    select(
+      "type",
+      fingerprint = "analysis",
+      "status",
+      parent = "parent_analysis"
+    )
 }

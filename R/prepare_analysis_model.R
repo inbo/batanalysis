@@ -4,9 +4,11 @@
 #' @inheritParams n2kanalysis::store_model
 #' @inheritParams n2kanalysis::display
 #' @export
-#' @importFrom n2kanalysis manifest_yaml_to_bash n2k_manifest
+#' @importFrom n2kanalysis manifest_yaml_to_bash n2k_aggregate_composite
+#' @importFrom n2kanalysis n2k_manifest
 #' @importFrom n2kanalysis store_manifest_yaml
 #' @importFrom purrr map_dfr
+#' @importFrom tidyr nest unnest
 prepare_analysis_model <- function(
   raw_data,
   start_winter = as.integer(format(Sys.Date(), "%Y")) - 23,
@@ -72,8 +74,48 @@ prepare_analysis_model <- function(
       parent = ifelse(.data$parent == "", NA_character_, .data$parent)
     ) |>
     bind_rows(model) -> all_model
+  # saveRDS(all_model, "inst/all_models.rds")
+  all_model <- readRDS("inst/all_models.rds")
+  tail(all_model$fingerprint, 1) |>
+    read_model(base = base, project = project) |>
+    slot("AnalysisMetadata") -> metadata
   all_model |>
-    select("fingerprint", "parent") |>
+    filter(.data$type %in% c("location", "province", "type", "tot")) |>
+    distinct(
+      .data$type,
+      parent_analysis = .data$fingerprint,
+      parentstatus_fingerprint = .data$status,
+      parent_status = "waiting"
+    ) |>
+    nest(.by = .data$type) |>
+    mutate(
+      fingerprint = n2k_aggregate_composite(
+        parent_status = .data$data[[1]],
+        status = "waiting",
+        result_datasource_id = metadata$result_datasource_id,
+        scheme_id = metadata$scheme_id,
+        species_group_id = "totaal",
+        location_group_id = metadata$location_group_id,
+        model_type = "totaal",
+        first_imported_year = metadata$first_imported_year,
+        last_imported_year = metadata$last_imported_year,
+        duration = metadata$duration,
+        last_analysed_year = metadata$last_analysed_year,
+        analysis_date = metadata$analysis_date,
+        fun = function(...) {
+          sum(..., na.rm = TRUE)
+        },
+        seed = metadata$seed,
+        formula = "count ~ 1"
+      ) |>
+        get_file_fingerprint()
+    ) |>
+    unnest("data") |>
+    select("fingerprint", parent = "parent_analysis") |>
+    bind_rows(
+      all_model |>
+        select("fingerprint", "parent")
+    ) |>
     n2k_manifest() |>
     store_manifest_yaml(
       base = base,
