@@ -3,7 +3,7 @@
 #' @export
 #' @importFrom assertthat assert_that
 #' @importFrom DBI dbGetQuery
-#' @importFrom dplyr transmute
+#' @importFrom dplyr mutate transmute
 #' @importFrom rlang .data
 #' @importFrom sf st_as_sf st_drop_geometry st_join st_read st_transform
 #' @importFrom sf st_within
@@ -30,7 +30,14 @@ WHERE p.name = 'Vleermuizen - Wintertellingen'" |>
   ) |>
     st_read(layer = "CL:Province", quiet = TRUE) |>
     st_transform(crs = 4326) |>
-    transmute(province = factor(.data$NameDUT)) |>
+    transmute(
+      province = gsub(
+        pattern = "Provincie ",
+        replacement = "",
+        .data$NameDUT
+      )
+    ) |>
     st_join(x = location, join = st_within) |>
-    st_drop_geometry()
+    st_drop_geometry() |>
+    mutate(province = factor(.data$province))
 }
