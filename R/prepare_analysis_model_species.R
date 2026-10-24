@@ -12,8 +12,9 @@
 #' @importFrom dplyr bind_rows distinct filter inner_join left_join mutate
 #' @importFrom dplyr n_distinct select slice_min slice_max
 #' @importFrom git2rdata recent_commit verify_vc
-#' @importFrom n2kanalysis display n2k_aggregate n2k_hurdle_imputed
-#' @importFrom n2kanalysis n2k_model_imputed n2k_spde spde store_model
+#' @importFrom n2kanalysis display n2k_aggregate n2k_aggregate_composite
+#' @importFrom n2kanalysis n2k_hurdle_imputed n2k_model_imputed n2k_spde spde
+#' @importFrom n2kanalysis store_model
 #' @importFrom rlang .data sym
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
 #' @importFrom splines ns
@@ -656,6 +657,182 @@ prepare_analysis_model_species <- function(
     overwrite = overwrite
   )
 
+  calc_ratio <- function(i) {
+    stopifnot(length(i) == 2)
+    min(i) / max(i)
+  }
+  # create the aggregation by location ratio
+  # fmt: skip
+  aggregated_location_tot_ratio <- n2k_aggregate_composite(
+    parent_status = data.frame(
+      parent_analysis = c(
+        aggregated_location@AnalysisMetadata$file_fingerprint,
+        aggregated_tot@AnalysisMetadata$file_fingerprint
+      ),
+      parentstatus_fingerprint = c(
+        aggregated_location@AnalysisMetadata$status_fingerprint,
+        aggregated_tot@AnalysisMetadata$status_fingerprint
+      ),
+      parent_status = "waiting"
+    ),
+    fun = calc_ratio,
+    result_datasource_id =
+      aggregated_type@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_type@AnalysisMetadata$scheme_id,
+    species_group_id = aggregated_type@AnalysisMetadata$species_group_id,
+    location_group_id = aggregated_type@AnalysisMetadata$location_group_id,
+    model_type = "ratio to total",
+    formula = "~location_id",
+    status = "waiting",
+    first_imported_year = aggregated_type@AnalysisMetadata$first_imported_year,
+    last_imported_year = aggregated_type@AnalysisMetadata$last_imported_year,
+    duration = aggregated_type@AnalysisMetadata$duration,
+    last_analysed_year = aggregated_type@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_type@AnalysisMetadata$analysis_date
+  )
+  store_model(
+    aggregated_location_tot_ratio,
+    base = base,
+    project = project,
+    overwrite = overwrite
+  )
+  # fmt: skip
+  aggregated_province_tot_ratio <- n2k_aggregate_composite(
+    parent_status = data.frame(
+      parent_analysis = c(
+        aggregated_province@AnalysisMetadata$file_fingerprint,
+        aggregated_tot@AnalysisMetadata$file_fingerprint
+      ),
+      parentstatus_fingerprint = c(
+        aggregated_province@AnalysisMetadata$status_fingerprint,
+        aggregated_tot@AnalysisMetadata$status_fingerprint
+      ),
+      parent_status = "waiting"
+    ),
+    fun = calc_ratio,
+    result_datasource_id =
+      aggregated_type@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_type@AnalysisMetadata$scheme_id,
+    species_group_id = aggregated_type@AnalysisMetadata$species_group_id,
+    location_group_id = aggregated_type@AnalysisMetadata$location_group_id,
+    model_type = "ratio to total",
+    formula = "~province",
+    status = "waiting",
+    first_imported_year = aggregated_type@AnalysisMetadata$first_imported_year,
+    last_imported_year = aggregated_type@AnalysisMetadata$last_imported_year,
+    duration = aggregated_type@AnalysisMetadata$duration,
+    last_analysed_year = aggregated_type@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_type@AnalysisMetadata$analysis_date
+  )
+  store_model(
+    aggregated_province_tot_ratio,
+    base = base,
+    project = project,
+    overwrite = overwrite
+  )
+  # fmt: skip
+  aggregated_type_tot_ratio <- n2k_aggregate_composite(
+    parent_status = data.frame(
+      parent_analysis = c(
+        aggregated_type@AnalysisMetadata$file_fingerprint,
+        aggregated_tot@AnalysisMetadata$file_fingerprint
+      ),
+      parentstatus_fingerprint = c(
+        aggregated_type@AnalysisMetadata$status_fingerprint,
+        aggregated_tot@AnalysisMetadata$status_fingerprint
+      ),
+      parent_status = "waiting"
+    ),
+    fun = calc_ratio,
+    result_datasource_id =
+      aggregated_type@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_type@AnalysisMetadata$scheme_id,
+    species_group_id = aggregated_type@AnalysisMetadata$species_group_id,
+    location_group_id = aggregated_type@AnalysisMetadata$location_group_id,
+    model_type = "ratio to total",
+    formula = "~location_id",
+    status = "waiting",
+    first_imported_year = aggregated_type@AnalysisMetadata$first_imported_year,
+    last_imported_year = aggregated_type@AnalysisMetadata$last_imported_year,
+    duration = aggregated_type@AnalysisMetadata$duration,
+    last_analysed_year = aggregated_type@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_type@AnalysisMetadata$analysis_date
+  )
+  store_model(
+    aggregated_type_tot_ratio,
+    base = base,
+    project = project,
+    overwrite = overwrite
+  )
+  # fmt: skip
+  aggregated_location_prov_ratio <- n2k_aggregate_composite(
+    parent_status = data.frame(
+      parent_analysis = c(
+        aggregated_location@AnalysisMetadata$file_fingerprint,
+        aggregated_province@AnalysisMetadata$file_fingerprint
+      ),
+      parentstatus_fingerprint = c(
+        aggregated_location@AnalysisMetadata$status_fingerprint,
+        aggregated_province@AnalysisMetadata$status_fingerprint
+      ),
+      parent_status = "waiting"
+    ),
+    fun = calc_ratio,
+    result_datasource_id =
+      aggregated_type@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_type@AnalysisMetadata$scheme_id,
+    species_group_id = aggregated_type@AnalysisMetadata$species_group_id,
+    location_group_id = aggregated_type@AnalysisMetadata$location_group_id,
+    model_type = "ratio to province",
+    formula = "~location_id",
+    status = "waiting",
+    first_imported_year = aggregated_type@AnalysisMetadata$first_imported_year,
+    last_imported_year = aggregated_type@AnalysisMetadata$last_imported_year,
+    duration = aggregated_type@AnalysisMetadata$duration,
+    last_analysed_year = aggregated_type@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_type@AnalysisMetadata$analysis_date
+  )
+  store_model(
+    aggregated_location_prov_ratio,
+    base = base,
+    project = project,
+    overwrite = overwrite
+  )
+  # fmt: skip
+  aggregated_location_type_ratio <- n2k_aggregate_composite(
+    parent_status = data.frame(
+      parent_analysis = c(
+        aggregated_location@AnalysisMetadata$file_fingerprint,
+        aggregated_type@AnalysisMetadata$file_fingerprint
+      ),
+      parentstatus_fingerprint = c(
+        aggregated_location@AnalysisMetadata$status_fingerprint,
+        aggregated_type@AnalysisMetadata$status_fingerprint
+      ),
+      parent_status = "waiting"
+    ),
+    fun = calc_ratio,
+    result_datasource_id =
+      aggregated_type@AnalysisMetadata$result_datasource_id,
+    scheme_id = aggregated_type@AnalysisMetadata$scheme_id,
+    species_group_id = aggregated_type@AnalysisMetadata$species_group_id,
+    location_group_id = aggregated_type@AnalysisMetadata$location_group_id,
+    model_type = "ratio to type",
+    formula = "~location_id",
+    status = "waiting",
+    first_imported_year = aggregated_type@AnalysisMetadata$first_imported_year,
+    last_imported_year = aggregated_type@AnalysisMetadata$last_imported_year,
+    duration = aggregated_type@AnalysisMetadata$duration,
+    last_analysed_year = aggregated_type@AnalysisMetadata$last_analysed_year,
+    analysis_date = aggregated_type@AnalysisMetadata$analysis_date
+  )
+  store_model(
+    aggregated_location_type_ratio,
+    base = base,
+    project = project,
+    overwrite = overwrite
+  )
+
   display(verbose = verbose, "    index model")
   extractor_fun <- function(model) {
     rbind(
@@ -817,6 +994,31 @@ prepare_analysis_model_species <- function(
       mutate(
         type = "tot",
         status = aggregated_tot@AnalysisMetadata$status_fingerprint
+      ),
+    aggregated_location_tot_ratio@AnalysisRelation |>
+      mutate(
+        type = "location",
+        status = aggregated_location_tot_ratio@AnalysisMetadata$status_fingerprint
+      ),
+    aggregated_province_tot_ratio@AnalysisRelation |>
+      mutate(
+        type = "province",
+        status = aggregated_province_tot_ratio@AnalysisMetadata$status_fingerprint
+      ),
+    aggregated_type_tot_ratio@AnalysisRelation |>
+      mutate(
+        type = "type_tot",
+        status = aggregated_type_tot_ratio@AnalysisMetadata$status_fingerprint
+      ),
+    aggregated_location_prov_ratio@AnalysisRelation |>
+      mutate(
+        type = "location_province",
+        status = aggregated_location_prov_ratio@AnalysisMetadata$status_fingerprint
+      ),
+    aggregated_location_type_ratio@AnalysisRelation |>
+      mutate(
+        type = "location_type",
+        status = aggregated_location_type_ratio@AnalysisMetadata$status_fingerprint
       ),
     total_index@AnalysisRelation |>
       mutate(

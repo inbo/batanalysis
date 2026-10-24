@@ -7,7 +7,7 @@
 #' @importFrom n2kanalysis manifest_yaml_to_bash n2k_aggregate_composite
 #' @importFrom n2kanalysis n2k_manifest
 #' @importFrom n2kanalysis store_manifest_yaml
-#' @importFrom purrr map_dfr
+#' @importFrom purrr map_dfr pmap
 #' @importFrom tidyr nest unnest
 prepare_analysis_model <- function(
   raw_data,
@@ -74,8 +74,8 @@ prepare_analysis_model <- function(
       parent = ifelse(.data$parent == "", NA_character_, .data$parent)
     ) |>
     bind_rows(model) -> all_model
-  # saveRDS(all_model, "inst/all_models.rds")
-  all_model <- readRDS("inst/all_models.rds")
+
+  display("Sum over all species", verbose = verbose)
   tail(all_model$fingerprint, 1) |>
     read_model(base = base, project = project) |>
     slot("AnalysisMetadata") -> metadata
@@ -87,7 +87,7 @@ prepare_analysis_model <- function(
       parentstatus_fingerprint = .data$status,
       parent_status = "waiting"
     ) |>
-    nest(.by = .data$type) |>
+    nest(.by = "type") |>
     mutate(
       fingerprint = n2k_aggregate_composite(
         parent_status = .data$data[[1]],
@@ -108,11 +108,69 @@ prepare_analysis_model <- function(
         seed = metadata$seed,
         formula = "count ~ 1"
       ) |>
-        get_file_fingerprint()
+        slot("AnalysisMetadata") |>
+        select(fingerprint = "file_fingerprint", "status_fingerprint") |>
+        list()
     ) |>
+    unnest("fingerprint") |>
     unnest("data") |>
-    select("fingerprint", parent = "parent_analysis") |>
+    select(
+      "fingerprint",
+      "status_fingerprint",
+      parent = "parent_analysis"
+    ) -> total_model
+
+  display("Ratio of species to sum of all species", verbose = verbose)
+  calc_ratio <- function(i) {
+    stopifnot(length(i) == 2)
+    min(i) / max(i)
+  }
+  all_model |>
+    filter(.data$type %in% c("location", "province", "type", "tot")) |>
+    select("type", parent = "fingerprint", "status") |>
+    inner_join(total_model, by = "parent") |>
+    transmute(
+      model = pmap(
+        list(
+          .data$parent,
+          .data$fingerprint,
+          .data$status,
+          .data$status_fingerprint,
+          .data$type
+        ),
+        function(parent, fingerprint, status, status_fingerprint, type) {
+          n2k_aggregate_composite(
+            parent_status = data.frame(
+              parent_analysis = c(parent, fingerprint),
+              parentstatus_fingerprint = c(status, status_fingerprint),
+              parent_status = "waiting"
+            ),
+            fun = calc_ratio,
+            result_datasource_id = metadata$result_datasource_id,
+            scheme_id = metadata$scheme_id,
+            species_group_id = metadata$species_group_id,
+            location_group_id = metadata$location_group_id,
+            model_type = "ratio to sum of all species",
+            formula = paste0("~", type),
+            status = "waiting",
+            first_imported_year = metadata$first_imported_year,
+            last_imported_year = metadata$last_imported_year,
+            duration = metadata$duration,
+            last_analysed_year = metadata$last_analysed_year,
+            analysis_date = metadata$analysis_date
+          ) |>
+            slot("AnalysisRelation")
+        }
+      )
+    ) |>
+    unnest("model") |>
+    select(fingerprint = "analysis", parent = "parent_analysis") -> rel_tot
+
+  display("Creating manifest", verbose = verbose)
+  rel_tot |>
     bind_rows(
+      total_model |>
+        select("fingerprint", "parent"),
       all_model |>
         select("fingerprint", "parent")
     ) |>

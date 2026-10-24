@@ -110,6 +110,7 @@ importFrom(purrr,
   map,
   map2_dfc,
   map_dfr,
+  pmap,
   walk,
   walk2
 )
