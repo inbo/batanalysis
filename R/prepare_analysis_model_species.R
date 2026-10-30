@@ -750,7 +750,7 @@ prepare_analysis_model_species <- function(
     species_group_id = aggregated_type@AnalysisMetadata$species_group_id,
     location_group_id = aggregated_type@AnalysisMetadata$location_group_id,
     model_type = "ratio to total",
-    formula = "~location_id",
+    formula = "~type",
     status = "waiting",
     first_imported_year = aggregated_type@AnalysisMetadata$first_imported_year,
     last_imported_year = aggregated_type@AnalysisMetadata$last_imported_year,

@@ -182,7 +182,7 @@ prepare_analysis_model <- function(
       dependencies = c(
         "inbo/multimput@hotfix",
         "inbo/n2khelper@0.5.1",
-        "inbo/n2kanalysis@0.4.1"
+        "inbo/n2kanalysis@test"
       )
     ) |>
     basename() |>
