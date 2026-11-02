@@ -19,6 +19,7 @@ Imports:
     curl,
     DBI,
     dplyr,
+    fmesher,
     git2rdata,
     INLA,
     inlatools,

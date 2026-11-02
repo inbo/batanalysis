@@ -3,6 +3,7 @@
 S3method(extract_results,character)
 S3method(extract_results,default)
 S3method(extract_results,n2kAggregate)
+S3method(extract_results,n2kAggregateComposite)
 S3method(extract_results,n2kHurdleImputed)
 S3method(extract_results,n2kModelImputed)
 S3method(extract_results,n2kSpde)
@@ -26,7 +27,6 @@ export(unsurveyed_sublocations)
 export(visit_type)
 importFrom(DBI,dbGetQuery)
 importFrom(INLA,
-  inla.mesh.projector,
   inla.posterior.sample,
   inla.zmarginal
 )
@@ -71,11 +71,13 @@ importFrom(dplyr,
   transmute,
   ungroup
 )
+importFrom(fmesher,fm_evaluator)
 importFrom(git2rdata,
   commit,
   is_git2rdata,
   read_vc,
   recent_commit,
+  rm_data,
   update_metadata,
   verify_vc,
   write_vc
