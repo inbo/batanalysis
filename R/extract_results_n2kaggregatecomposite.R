@@ -19,7 +19,7 @@ extract_results.n2kAggregateComposite <- function(x, root, ...) {
       names_to = "imputation",
       values_to = "value"
     ) -> results
-  if (x@AnalysisMetadata$formula == "~location_id") {
+  if (x@AnalysisMetadata$formula %in% c("~location_id", "~location")) {
     results |>
       group_by(.data$winter, .data$province, .data$type, .data$location_id) |>
       summarise(
@@ -52,10 +52,17 @@ extract_results.n2kAggregateComposite <- function(x, root, ...) {
           )
       ) |>
       write_vc(
-        file = file.path("hibernation", "composite_location"), root = root,
-        optimize = FALSE, append = TRUE,
+        file = file.path("hibernation", "composite_location"),
+        root = root,
+        optimize = FALSE,
+        append = TRUE,
         sorting = c(
-          "model_type", "species", "winter", "province", "type", "location_id",
+          "model_type",
+          "species",
+          "winter",
+          "province",
+          "type",
+          "location_id",
           "analysis"
         ),
         digits = 4
@@ -142,6 +149,50 @@ extract_results.n2kAggregateComposite <- function(x, root, ...) {
         file = file.path("hibernation", "composite_type"), root = root,
         optimize = FALSE, append = TRUE,
         sorting = c("model_type", "species", "winter", "type", "analysis"),
+        digits = 4
+      )
+    rm(x, results)
+    gc(verbose = FALSE)
+    return(invisible(NULL))
+  }
+  if (x@AnalysisMetadata$formula == "~tot") {
+    results |>
+      group_by(.data$winter) |>
+      summarise(
+        across(
+          "value",
+          .names = "{.fn}",
+          list(
+            mean = ~ mean(.x, na.rm = TRUE),
+            sd = ~ sd(.x, na.rm = TRUE),
+            min = ~ min(.x, na.rm = TRUE),
+            p05 = ~ quantile(.x, 0.05, na.rm = TRUE),
+            p20 = ~ quantile(.x, 0.20, na.rm = TRUE),
+            p35 = ~ quantile(.x, 0.35, na.rm = TRUE),
+            p50 = ~ quantile(.x, 0.50, na.rm = TRUE),
+            p65 = ~ quantile(.x, 0.65, na.rm = TRUE),
+            p80 = ~ quantile(.x, 0.80, na.rm = TRUE),
+            p95 = ~ quantile(.x, 0.95, na.rm = TRUE),
+            max = ~ max(.x, na.rm = TRUE)
+          )
+        ),
+        .groups = "drop"
+      ) |>
+      bind_cols(
+        x@AnalysisMetadata |>
+          select(
+            species = "species_group_id",
+            "model_type",
+            analysis = "file_fingerprint",
+            fingerprint = "status_fingerprint"
+          )
+      ) |>
+      write_vc(
+        file = file.path("hibernation", "composite_total"),
+        root = root,
+        optimize = FALSE,
+        append = TRUE,
+        sorting = c("model_type", "species", "winter", "analysis"),
         digits = 4
       )
     rm(x, results)

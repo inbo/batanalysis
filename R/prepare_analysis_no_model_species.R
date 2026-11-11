@@ -333,5 +333,6 @@ prepare_analysis_no_model_species <- function(
       fingerprint = "analysis",
       "status",
       parent = "parent_analysis"
-    )
+    ) |>
+    mutate(species_group_id = species)
 }

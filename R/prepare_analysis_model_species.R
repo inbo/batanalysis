@@ -663,7 +663,7 @@ prepare_analysis_model_species <- function(
   }
   # create the aggregation by location ratio
   # fmt: skip
-  aggregated_location_tot_ratio <- n2k_aggregate_composite(
+  agg_location_tot_ratio <- n2k_aggregate_composite(
     parent_status = data.frame(
       parent_analysis = c(
         aggregated_location@AnalysisMetadata$file_fingerprint,
@@ -691,13 +691,13 @@ prepare_analysis_model_species <- function(
     analysis_date = aggregated_type@AnalysisMetadata$analysis_date
   )
   store_model(
-    aggregated_location_tot_ratio,
+    agg_location_tot_ratio,
     base = base,
     project = project,
     overwrite = overwrite
   )
   # fmt: skip
-  aggregated_province_tot_ratio <- n2k_aggregate_composite(
+  agg_province_tot_ratio <- n2k_aggregate_composite(
     parent_status = data.frame(
       parent_analysis = c(
         aggregated_province@AnalysisMetadata$file_fingerprint,
@@ -725,13 +725,13 @@ prepare_analysis_model_species <- function(
     analysis_date = aggregated_type@AnalysisMetadata$analysis_date
   )
   store_model(
-    aggregated_province_tot_ratio,
+    agg_province_tot_ratio,
     base = base,
     project = project,
     overwrite = overwrite
   )
   # fmt: skip
-  aggregated_type_tot_ratio <- n2k_aggregate_composite(
+  agg_type_tot_ratio <- n2k_aggregate_composite(
     parent_status = data.frame(
       parent_analysis = c(
         aggregated_type@AnalysisMetadata$file_fingerprint,
@@ -759,13 +759,13 @@ prepare_analysis_model_species <- function(
     analysis_date = aggregated_type@AnalysisMetadata$analysis_date
   )
   store_model(
-    aggregated_type_tot_ratio,
+    agg_type_tot_ratio,
     base = base,
     project = project,
     overwrite = overwrite
   )
   # fmt: skip
-  aggregated_location_prov_ratio <- n2k_aggregate_composite(
+  agg_location_prov_ratio <- n2k_aggregate_composite(
     parent_status = data.frame(
       parent_analysis = c(
         aggregated_location@AnalysisMetadata$file_fingerprint,
@@ -793,13 +793,13 @@ prepare_analysis_model_species <- function(
     analysis_date = aggregated_type@AnalysisMetadata$analysis_date
   )
   store_model(
-    aggregated_location_prov_ratio,
+    agg_location_prov_ratio,
     base = base,
     project = project,
     overwrite = overwrite
   )
   # fmt: skip
-  aggregated_location_type_ratio <- n2k_aggregate_composite(
+  agg_location_type_ratio <- n2k_aggregate_composite(
     parent_status = data.frame(
       parent_analysis = c(
         aggregated_location@AnalysisMetadata$file_fingerprint,
@@ -827,7 +827,7 @@ prepare_analysis_model_species <- function(
     analysis_date = aggregated_type@AnalysisMetadata$analysis_date
   )
   store_model(
-    aggregated_location_type_ratio,
+    agg_location_type_ratio,
     base = base,
     project = project,
     overwrite = overwrite
@@ -995,34 +995,40 @@ prepare_analysis_model_species <- function(
         type = "tot",
         status = aggregated_tot@AnalysisMetadata$status_fingerprint
       ),
-    aggregated_location_tot_ratio@AnalysisRelation |>
+    agg_location_tot_ratio@AnalysisRelation |>
       mutate(
-        type = "location",
-        status = aggregated_location_tot_ratio@AnalysisMetadata$status_fingerprint
+        type = "location_ratio",
+        total = FALSE,
+        status = agg_location_tot_ratio@AnalysisMetadata$status_fingerprint
       ),
-    aggregated_province_tot_ratio@AnalysisRelation |>
+    agg_province_tot_ratio@AnalysisRelation |>
       mutate(
-        type = "province",
-        status = aggregated_province_tot_ratio@AnalysisMetadata$status_fingerprint
+        type = "province_ratio",
+        total = FALSE,
+        status = agg_province_tot_ratio@AnalysisMetadata$status_fingerprint
       ),
-    aggregated_type_tot_ratio@AnalysisRelation |>
+    agg_type_tot_ratio@AnalysisRelation |>
       mutate(
         type = "type_tot",
-        status = aggregated_type_tot_ratio@AnalysisMetadata$status_fingerprint
+        total = FALSE,
+        status = agg_type_tot_ratio@AnalysisMetadata$status_fingerprint
       ),
-    aggregated_location_prov_ratio@AnalysisRelation |>
+    agg_location_prov_ratio@AnalysisRelation |>
       mutate(
         type = "location_province",
-        status = aggregated_location_prov_ratio@AnalysisMetadata$status_fingerprint
+        total = FALSE,
+        status = agg_location_prov_ratio@AnalysisMetadata$status_fingerprint
       ),
-    aggregated_location_type_ratio@AnalysisRelation |>
+    agg_location_type_ratio@AnalysisRelation |>
       mutate(
         type = "location_type",
-        status = aggregated_location_type_ratio@AnalysisMetadata$status_fingerprint
+        total = FALSE,
+        status = agg_location_type_ratio@AnalysisMetadata$status_fingerprint
       ),
     total_index@AnalysisRelation |>
       mutate(
         type = "total_index",
+        total = FALSE,
         status = total_index@AnalysisMetadata$status_fingerprint
       )
   ) |>
@@ -1031,5 +1037,6 @@ prepare_analysis_model_species <- function(
       fingerprint = "analysis",
       "status",
       parent = "parent_analysis"
-    )
+    ) |>
+    mutate(species_group_id = species)
 }
